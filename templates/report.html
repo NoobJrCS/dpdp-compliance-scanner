@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DPDP Compliance Report — {{ report.target_url }}</title>
+    <link rel="stylesheet" href="{{ css_path }}">
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- PAGE 1: COVER PAGE                                           -->
+<!-- ============================================================ -->
+<div class="cover-page">
+
+    <div class="cover-logo-bar">
+        <div class="tool-name">DPDP COMPLIANCE SCANNER</div>
+        <div class="tool-tagline">
+            Automated audit tool for the Digital Personal Data Protection Act 2023
+        </div>
+    </div>
+
+    <div class="cover-document-type">Compliance Audit Report</div>
+
+    <div class="cover-title">
+        {{ report.target_url | replace("https://", "") | replace("http://", "") }}
+    </div>
+
+    <div class="cover-subtitle">DPDP Act 2023 — Compliance Assessment</div>
+
+    <!-- Score Circle -->
+    <div class="cover-score-block" 
+         style="border-color: {{ report.grade_color }}; 
+                color: {{ report.grade_color }};">
+        <span class="score-number">{{ report.risk_score }}</span>
+        <span class="score-label">/ 100</span>
+    </div>
+    <br>
+
+    <div class="cover-grade" style="color: {{ report.grade_color }};">
+        Grade {{ report.risk_grade }}
+    </div>
+
+    <div class="cover-risk-level">{{ report.risk_level }}</div>
+
+    <!-- Meta Table -->
+    <table class="cover-meta-table">
+        <tr>
+            <td class="meta-key">Target URL</td>
+            <td class="meta-value">{{ report.target_url }}</td>
+        </tr>
+        <tr>
+            <td class="meta-key">Scan Date</td>
+            <td class="meta-value">{{ report.scan_date }}</td>
+        </tr>
+        <tr>
+            <td class="meta-key">Scan Duration</td>
+            <td class="meta-value">{{ report.scan_duration_seconds }}s</td>
+        </tr>
+        <tr>
+            <td class="meta-key">Total Checks</td>
+            <td class="meta-value">{{ report.summary.total_checks }} rules evaluated</td>
+        </tr>
+        <tr>
+            <td class="meta-key">Framework</td>
+            <td class="meta-value">
+                Digital Personal Data Protection Act, 2023 (India)
+            </td>
+        </tr>
+        <tr>
+            <td class="meta-key">Audit Confidence</td>
+            <td class="meta-value">
+                {{ report.audit_confidence | default("High") | capitalize }}
+            </td>
+        </tr>
+    </table>
+
+</div>
+
+
+<!-- ============================================================ -->
+<!-- PAGE 2: EXECUTIVE SUMMARY                                    -->
+<!-- ============================================================ -->
+<div class="section no-break">
+    <div class="section-header">01 — Executive Summary</div>
+
+    <!-- 4-stat summary grid -->
+    <table class="summary-grid">
+        <tr>
+            <td>
+                <span class="stat-number stat-pass">
+                    {{ report.summary.passed }}
+                </span>
+                <span class="stat-label">Checks Passed</span>
+            </td>
+            <td>
+                <span class="stat-number stat-critical">
+                    {{ report.summary.critical_failures }}
+                </span>
+                <span class="stat-label">Critical Failures</span>
+            </td>
+            <td>
+                <span class="stat-number stat-high">
+                    {{ report.summary.high_failures }}
+                </span>
+                <span class="stat-label">High Failures</span>
+            </td>
+            <td>
+                <span class="stat-number stat-medium">
+                    {{ report.summary.medium_failures }}
+                </span>
+                <span class="stat-label">Medium Failures</span>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Critical Violations Banner -->
+    {% if report.critical_violations %}
+    <div class="critical-banner">
+        <div class="banner-title">
+            ⚠ Critical Violations Detected — Immediate Action Required
+        </div>
+        {% for v in report.critical_violations %}
+        <div class="banner-item">
+            → {{ v.label }} ({{ v.rule_id }})
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-critical-banner">
+        ✓ No Critical violations detected. 
+          Review High and Medium findings below.
+    </div>
+    {% endif %}
+
+    <!-- Assessment Paragraph -->
+    <p style="font-size: 9pt; color: #374151; line-height: 1.7;">
+        This automated audit assessed <strong>{{ report.target_url }}</strong>
+        against <strong>{{ report.summary.total_checks }} compliance rules</strong>
+        derived from the Digital Personal Data Protection Act 2023 (DPDP Act).
+        The website achieved a risk score of
+        <strong style="color: {{ report.grade_color }};">
+            {{ report.risk_score }}/100 (Grade {{ report.risk_grade }})
+        </strong>,
+        indicating a <strong>{{ report.risk_level }}</strong> compliance posture.
+
+        {% if report.summary.critical_failures > 0 %}
+        <strong>{{ report.summary.critical_failures }} Critical violation(s)</strong>
+        were identified that represent direct non-compliance with mandatory 
+        provisions of the DPDP Act and require immediate remediation.
+        {% endif %}
+
+        A total of <strong>{{ report.score_breakdown.total_deducted }} points</strong>
+        were deducted from the maximum possible score of 100.
+        Detailed findings and remediation recommendations are provided in the 
+        sections below.
+    </p>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- PAGE 2 CONT: SCORE BREAKDOWN                                 -->
+<!-- ============================================================ -->
+<div class="section no-break mt-16">
+    <div class="section-header">02 — Score Breakdown</div>
+
+    <p class="muted mb-8">
+        Each failed check deducts a weighted number of points based on its 
+        severity. Critical checks carry the highest weight.
+    </p>
+
+    {% if report.score_breakdown.deductions %}
+        {% for d in report.score_breakdown.deductions %}
+        <div class="score-bar-row no-break">
+            <div class="score-bar-label">
+                {{ d.rule_id }} — {{ d.label }}
+                <span class="muted">({{ d.severity }})</span>
+            </div>
+            <div class="score-bar-track">
+                <div class="score-bar-fill"
+                     style="width: {{ d.points_deducted }}%;
+                            background: {% if d.severity == 'Critical' %}#ef4444
+                                        {% elif d.severity == 'High' %}#f97316
+                                        {% else %}#eab308{% endif %};">
+                </div>
+            </div>
+            <div class="score-bar-points text-right">
+                −{{ d.points_deducted }} pts
+            </div>
+        </div>
+        {% endfor %}
+
+        <table style="width:100%; font-size:9pt; margin-top:12px;">
+            <tr>
+                <td style="color:#6b7280;">Total Deducted</td>
+                <td style="text-align:right; font-weight:800; color:#ef4444;">
+                    −{{ report.score_breakdown.total_deducted }} pts
+                </td>
+            </tr>
+            <tr>
+                <td style="color:#6b7280;">Final Score</td>
+                <td style="text-align:right; font-weight:800; 
+                           color:{{ report.grade_color }};">
+                    {{ report.risk_score }} / 100
+                </td>
+            </tr>
+        </table>
+    {% else %}
+        <p style="color:#22c55e; font-weight:600; font-size:9pt;">
+            ✓ No deductions — all checks passed.
+        </p>
+    {% endif %}
+</div>
+
+
+<!-- ============================================================ -->
+<!-- PAGE 3: DETAILED AUDIT FINDINGS                              -->
+<!-- ============================================================ -->
+<div class="section page-break">
+    <div class="section-header">03 — Detailed Audit Findings</div>
+
+    <table class="checks-table">
+        <thead>
+            <tr>
+                <th style="width:10%;">Rule ID</th>
+                <th style="width:35%;">Check</th>
+                <th style="width:12%;">Severity</th>
+                <th style="width:10%;">Result</th>
+                <th style="width:10%;">Pts Lost</th>
+                <th style="width:23%;">Check Method</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rule_id, check in report.checks.items() %}
+            <tr>
+                <td class="bold" style="color:#0f172a; font-size:8pt;">
+                    {{ rule_id }}
+                </td>
+                <td>{{ check.label }}</td>
+                <td>
+                    <span class="badge badge-{{ check.severity | lower }}">
+                        {{ check.severity }}
+                    </span>
+                </td>
+                <td>
+                    {% if check.passed %}
+                        <span class="badge badge-pass">Pass</span>
+                    {% else %}
+                        <span class="badge badge-fail">Fail</span>
+                    {% endif %}
+                </td>
+                <td class="text-center bold"
+                    style="color: {% if check.points_deducted > 0 %}
+                                      #ef4444{% else %}#22c55e{% endif %};">
+                    {% if check.points_deducted > 0 %}
+                        −{{ check.points_deducted }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </td>
+                <td class="muted">{{ check.check_type | replace("_", " ") }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- PAGE 4: RECOMMENDATIONS                                      -->
+<!-- ============================================================ -->
+<div class="section page-break">
+    <div class="section-header">04 — Remediation Recommendations</div>
+
+    <p class="muted mb-8">
+        Recommendations are ordered by severity. 
+        Critical and High items should be addressed first.
+    </p>
+
+    {% if report.recommendations %}
+    <table class="rec-table">
+        {% for rec in report.recommendations %}
+        <tr>
+            <td class="rec-number">{{ loop.index }}</td>
+            <td class="rec-severity">
+                {% if '[Critical]' in rec %}
+                    <span class="badge badge-critical">Critical</span>
+                {% elif '[High]' in rec %}
+                    <span class="badge badge-high">High</span>
+                {% else %}
+                    <span class="badge badge-medium">Medium</span>
+                {% endif %}
+            </td>
+            <td class="rec-text">
+                {{ rec | replace('[Critical] ', '') 
+                       | replace('[High] ', '') 
+                       | replace('[Medium] ', '') }}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p style="color:#22c55e; font-weight:600; font-size:9pt;">
+        ✓ No recommendations — all checks passed.
+    </p>
+    {% endif %}
+</div>
+
+
+<!-- ============================================================ -->
+<!-- PAGE 5: SCAN METADATA                                        -->
+<!-- ============================================================ -->
+<div class="section page-break">
+    <div class="section-header">05 — Scan Metadata</div>
+
+    <div class="section-subheader">Pages Successfully Crawled</div>
+
+    {% if report.pages_crawled %}
+    <table class="crawled-table">
+        <thead>
+            <tr>
+                <th style="width:25%;">Page Label</th>
+                <th style="width:55%;">URL</th>
+                <th style="width:20%;">Characters Extracted</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for page in report.pages_crawled %}
+            <tr>
+                <td class="bold">{{ page.label }}</td>
+                <td style="font-size:7.5pt; color:#6b7280;">{{ page.url }}</td>
+                <td class="text-center">{{ "{:,}".format(page.char_count) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#ef4444; font-size:9pt;">
+        No pages were successfully crawled.
+    </p>
+    {% endif %}
+
+    {% if report.crawl_errors %}
+    <div class="section-subheader mt-16">Crawl Errors</div>
+    {% for error in report.crawl_errors %}
+    <p style="font-size:8.5pt; color:#b91c1c; padding: 3px 0;">
+        ✗ {{ error }}
+    </p>
+    {% endfor %}
+    {% endif %}
+
+    <div class="section-subheader mt-16">Audit Configuration</div>
+    <table style="width:60%; font-size:9pt; border-collapse:collapse;">
+        <tr>
+            <td style="padding:5px 8px; color:#6b7280; 
+                       border-bottom:1px solid #e5e7eb; width:40%;">
+                Audit Framework
+            </td>
+            <td style="padding:5px 8px; 
+                       border-bottom:1px solid #e5e7eb; font-weight:500;">
+                DPDP Act 2023 (India)
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:5px 8px; color:#6b7280; 
+                       border-bottom:1px solid #e5e7eb;">
+                Total Rules
+            </td>
+            <td style="padding:5px 8px; 
+                       border-bottom:1px solid #e5e7eb; font-weight:500;">
+                {{ report.summary.total_checks }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:5px 8px; color:#6b7280; 
+                       border-bottom:1px solid #e5e7eb;">
+                Scan Engine
+            </td>
+            <td style="padding:5px 8px; 
+                       border-bottom:1px solid #e5e7eb; font-weight:500;">
+                Playwright + spaCy NLP
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:5px 8px; color:#6b7280;">
+                Report Generated
+            </td>
+            <td style="padding:5px 8px; font-weight:500;">
+                {{ report.scan_date }} in {{ report.scan_duration_seconds }}s
+            </td>
+        </tr>
+    </table>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- PAGE 6: DISCLAIMER                                           -->
+<!-- ============================================================ -->
+<div class="disclaimer">
+    <h4>Legal Disclaimer &amp; Limitations</h4>
+    <p>
+        This report was generated by an automated compliance scanning tool 
+        and is intended for informational and educational purposes only. 
+        It does not constitute legal advice. The findings represent the 
+        output of automated text analysis and pattern matching against 
+        publicly accessible web pages and should not be treated as a 
+        definitive legal assessment of compliance with the Digital Personal 
+        Data Protection Act 2023 or any other applicable law.
+    </p>
+    <br>
+    <p>
+        Automated analysis may produce false positives or false negatives. 
+        Compliance with the DPDP Act requires a comprehensive legal review 
+        by a qualified Data Protection Officer or legal counsel. 
+        The authors of this tool accept no liability for decisions made 
+        based on this report.
+    </p>
+    <br>
+    <p>
+        All website content analyzed belongs to their respective owners. 
+        Scans were performed on publicly accessible pages only.
+    </p>
+</div>
+
+</body>
+</html>

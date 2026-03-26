@@ -1,0 +1,434 @@
+/* ================================================================
+   DPDP COMPLIANCE AUDIT REPORT — STYLESHEET
+   Designed for WeasyPrint PDF rendering.
+   Note: WeasyPrint supports most CSS3 but NOT flexbox/grid.
+   Use float-based or block layouts only.
+   ================================================================ */
+
+/* --- Page Setup ------------------------------------------------- */
+@page {
+    size: A4;
+    margin: 15mm 18mm 20mm 18mm;   /* top right bottom left */
+
+    /* Footer on every page */
+    @bottom-center {
+        content: "DPDP Compliance Audit Report — Confidential";
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 8pt;
+        color: #9ca3af;
+    }
+
+    /* Page number on every page */
+    @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 8pt;
+        color: #9ca3af;
+    }
+}
+
+/* --- Base Styles ------------------------------------------------ */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    color: #1f2937;
+    line-height: 1.5;
+    background: #ffffff;
+}
+
+/* --- Cover Page ------------------------------------------------- */
+.cover-page {
+    page-break-after: always;
+    padding: 40mm 0 20mm 0;
+    text-align: center;
+}
+
+.cover-logo-bar {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 14px 24px;
+    margin-bottom: 40px;
+    text-align: left;
+}
+
+.cover-logo-bar .tool-name {
+    font-size: 14pt;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #f1f5f9;
+}
+
+.cover-logo-bar .tool-tagline {
+    font-size: 8pt;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.cover-document-type {
+    font-size: 10pt;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 12px;
+}
+
+.cover-title {
+    font-size: 26pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+
+.cover-subtitle {
+    font-size: 13pt;
+    color: #4b5563;
+    margin-bottom: 40px;
+}
+
+/* Score circle on cover page */
+.cover-score-block {
+    display: inline-block;
+    border: 6px solid;
+    border-radius: 50%;
+    width: 110px;
+    height: 110px;
+    text-align: center;
+    padding-top: 22px;
+    margin-bottom: 30px;
+}
+
+.cover-score-block .score-number {
+    font-size: 28pt;
+    font-weight: 900;
+    line-height: 1;
+    display: block;
+}
+
+.cover-score-block .score-label {
+    font-size: 7pt;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-top: 2px;
+}
+
+.cover-grade {
+    font-size: 18pt;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.cover-risk-level {
+    font-size: 11pt;
+    color: #6b7280;
+    margin-bottom: 40px;
+}
+
+.cover-meta-table {
+    width: 60%;
+    margin: 0 auto;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 9pt;
+}
+
+.cover-meta-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cover-meta-table .meta-key {
+    color: #6b7280;
+    font-weight: 600;
+    width: 40%;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 8pt;
+}
+
+.cover-meta-table .meta-value {
+    color: #0f172a;
+    font-weight: 500;
+}
+
+/* --- Section Headers -------------------------------------------- */
+.section {
+    margin-bottom: 24px;
+}
+
+.section-header {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 8px 14px;
+    font-size: 10pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+
+.section-subheader {
+    font-size: 9pt;
+    font-weight: 700;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 4px;
+    margin-bottom: 10px;
+    margin-top: 16px;
+}
+
+/* --- Executive Summary ------------------------------------------ */
+.summary-grid {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+}
+
+.summary-grid td {
+    width: 25%;
+    text-align: center;
+    padding: 14px 8px;
+    border: 1px solid #e5e7eb;
+    vertical-align: middle;
+}
+
+.summary-grid .stat-number {
+    font-size: 22pt;
+    font-weight: 900;
+    line-height: 1;
+    display: block;
+}
+
+.summary-grid .stat-label {
+    font-size: 7.5pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    display: block;
+    margin-top: 4px;
+}
+
+.stat-critical  { color: #ef4444; }
+.stat-high      { color: #f97316; }
+.stat-medium    { color: #eab308; }
+.stat-pass      { color: #22c55e; }
+
+/* --- Score Breakdown Bar Chart ---------------------------------- */
+.score-bar-row {
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+.score-bar-label {
+    font-size: 8.5pt;
+    color: #374151;
+    margin-bottom: 2px;
+    font-weight: 500;
+}
+
+.score-bar-track {
+    background: #f3f4f6;
+    height: 14px;
+    width: 100%;
+    position: relative;
+}
+
+.score-bar-fill {
+    height: 14px;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.score-bar-points {
+    font-size: 7.5pt;
+    color: #6b7280;
+    text-align: right;
+    margin-top: 1px;
+}
+
+/* --- Audit Checks Table ----------------------------------------- */
+.checks-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    margin-bottom: 10px;
+}
+
+.checks-table th {
+    background: #1e293b;
+    color: #f8fafc;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 8pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.checks-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+}
+
+.checks-table tr:nth-child(even) td {
+    background: #f9fafb;
+}
+
+.checks-table tr:hover td {
+    background: #f0f9ff;
+}
+
+/* Status badges */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.badge-pass     { background: #dcfce7; color: #15803d; }
+.badge-fail     { background: #fee2e2; color: #b91c1c; }
+.badge-critical { background: #fee2e2; color: #b91c1c; }
+.badge-high     { background: #ffedd5; color: #c2410c; }
+.badge-medium   { background: #fef9c3; color: #a16207; }
+.badge-low      { background: #f0fdf4; color: #15803d; }
+
+/* --- Recommendations Table -------------------------------------- */
+.rec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+}
+
+.rec-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+}
+
+.rec-table tr:nth-child(even) td {
+    background: #f9fafb;
+}
+
+.rec-number {
+    font-weight: 800;
+    color: #0f172a;
+    width: 28px;
+    text-align: center;
+}
+
+.rec-severity {
+    width: 80px;
+    text-align: center;
+}
+
+.rec-text {
+    color: #374151;
+    line-height: 1.5;
+}
+
+/* --- Critical Violations Banner --------------------------------- */
+.critical-banner {
+    background: #fef2f2;
+    border-left: 5px solid #ef4444;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+}
+
+.critical-banner .banner-title {
+    font-size: 9pt;
+    font-weight: 700;
+    color: #b91c1c;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+}
+
+.critical-banner .banner-item {
+    font-size: 9pt;
+    color: #7f1d1d;
+    padding: 2px 0;
+}
+
+.no-critical-banner {
+    background: #f0fdf4;
+    border-left: 5px solid #22c55e;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+    font-size: 9pt;
+    color: #15803d;
+    font-weight: 600;
+}
+
+/* --- Pages Crawled Table ---------------------------------------- */
+.crawled-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    margin-bottom: 10px;
+}
+
+.crawled-table th {
+    background: #f1f5f9;
+    color: #374151;
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.crawled-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #4b5563;
+    word-break: break-all;
+}
+
+/* --- Footer / Disclaimer --------------------------------------- */
+.disclaimer {
+    page-break-before: always;
+    padding-top: 20px;
+    font-size: 7.5pt;
+    color: #9ca3af;
+    line-height: 1.6;
+    border-top: 1px solid #e5e7eb;
+}
+
+.disclaimer h4 {
+    color: #6b7280;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+}
+
+/* --- Utility Classes ------------------------------------------- */
+.text-center   { text-align: center; }
+.text-right    { text-align: right; }
+.mt-8          { margin-top: 8px; }
+.mt-16         { margin-top: 16px; }
+.mb-8          { margin-bottom: 8px; }
+.mb-16         { margin-bottom: 16px; }
+.page-break    { page-break-before: always; }
+.no-break      { page-break-inside: avoid; }
+.bold          { font-weight: 700; }
+.muted         { color: #9ca3af; font-size: 8pt; }
