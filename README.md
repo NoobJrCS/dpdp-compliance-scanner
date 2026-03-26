@@ -143,15 +143,14 @@ Every scan produces two outputs:
 
 ## Real-World Test Results
 
-| Website            | Score | Grade | Critical | High | Medium |
-|--------------------|-------|-------|----------|------|--------|
-| flipkart.com       | —     | —     | —        | —    | —      |
-| practo.com         | —     | —     | —        | —    | —      |
-| razorpay.com       | —     | —     | —        | —    | —      |
-| zomato.com         | —     | —     | —        | —    | —      |
-| policybazaar.com   | —     | —     | —        | —    | —      |
+| Website            | Score  | Grade | Critical | High | Medium |
+|--------------------|--------|-------|----------|------|--------|
+| flipkart.com       | 10/100 | F     | 2        | 3    | 4      |
+| practo.com         | 25/100 | F     | 1        | 4    | 4      |
+| razorpay.com       | 90/100 | A     | —        | 1    | —      |
+| zomato.com         | 0/100  | F     | 2        | 4    | 4      |
+| policybazaar.com   | 0/100  | F     | 2        | 4    | 4      |
 
-> Fill in with your actual scan results after running the scanner.
 
 ---
 
@@ -187,6 +186,4 @@ MIT License — free to use, modify, and distribute.
 
 ## Author
 
-**[Your Name]**  
-B.Tech / MCA [Your College], [Year]  
-[LinkedIn URL] | [Email]
+**Niket**
