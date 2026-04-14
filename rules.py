@@ -1,3 +1,5 @@
+# rules.py
+
 DPDP_RULES = [
     {
         "id": "DPDP-01",
@@ -11,7 +13,7 @@ DPDP_RULES = [
         "check_type": "page_exists",
         "target_page": "privacy",
         "keywords": ["privacy"],
-        "points": 25,   # ← NEW: highest weight — no policy = instant failure
+        "points": 25,
         "recommendation": (
             "Create a dedicated Privacy Policy page and link it clearly "
             "in the website footer. This is a non-negotiable legal requirement "
@@ -163,7 +165,7 @@ DPDP_RULES = [
             "partners", "service providers", "data processors",
             "affiliates", "disclose your information"
         ],
-        "points": 3,
+        "points": 2,
         "recommendation": (
             "Add a section to your Privacy Policy listing the categories of "
             "third parties with whom personal data is shared and the purpose "
@@ -183,7 +185,7 @@ DPDP_RULES = [
         "keywords": [
             r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}",
         ],
-        "points": 2,
+        "points": 1,
         "recommendation": (
             "Ensure at least one working contact email address is published "
             "on your Privacy Policy or Contact page for data-related queries."
@@ -210,9 +212,49 @@ DPDP_RULES = [
             "Describe how you obtain verifiable parental consent before processing "
             "personal data of users under 18."
         )
+    },
+    {
+        "id": "DPDP-11",
+        "label": "Grievance Officer Contact is Not a Placeholder",
+        "description": (
+            "Verifies that the Grievance Officer email address found "
+            "in the policy is not a dummy/template value and that its "
+            "domain actually exists and can receive email."
+        ),
+        "severity": "High",
+        "check_type": "contact_authentic",
+        "target_page": "any",
+        "keywords": [],
+        "points": 1,
+        "recommendation": (
+            "Replace placeholder or template email addresses with a real, "
+            "active Grievance Officer email on a company domain "
+            "(e.g. grievance@yourcompany.in). Ensure the domain has "
+            "valid DNS records and can receive email."
+        )
+    },
+    {
+        "id": "DPDP-12",
+        "label": "Grievance Officer Name is Not a Placeholder",
+        "description": (
+            "Verifies that the Grievance Officer name published in "
+            "the policy is a real person's name and not a template "
+            "placeholder like 'John Doe' or 'Insert Name Here'."
+        ),
+        "severity": "Medium",
+        "check_type": "contact_authentic",
+        "target_page": "any",
+        "keywords": [],
+        "points": 1,
+        "recommendation": (
+            "Replace placeholder names with the actual name of the "
+            "appointed Grievance Officer. The DPDP Act requires a "
+            "real, named individual to be responsible for grievance redressal."
+        )
     }
 ]
 
+# Safety check — all rule weights must add up to exactly 100
 _total_points = sum(r["points"] for r in DPDP_RULES)
 assert _total_points == 100, (
     f"Rule weights must total 100. Currently: {_total_points}. "
