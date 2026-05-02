@@ -4,7 +4,7 @@ import json
 import time
 import argparse
 from crawler  import run_crawler, fetch_page, normalize_url
-from auditor  import run_audit
+from auditor  import run_audit, get_verification_result
 from scorer   import generate_score_report
 from reporter import generate_pdf_report
 
@@ -19,7 +19,6 @@ Examples:
   python scanner.py --from-json report_flipkart_com.json
         """
     )
-
     parser.add_argument(
         "domain",
         nargs="?",
@@ -33,7 +32,6 @@ Examples:
 
     args = parser.parse_args()
 
-    # Must provide either a domain or --from-json
     if not args.domain and not args.from_json:
         parser.print_help()
         sys.exit(1)
@@ -42,7 +40,7 @@ Examples:
 
 
 def main():
-    args = parse_args()
+    args       = parse_args()
     scan_start = time.time()
 
     # ---------------------------------------------------------------
@@ -61,7 +59,7 @@ def main():
             sys.exit(1)
 
     # ---------------------------------------------------------------
-    # PATH B: Full scan (crawl → audit → score)
+    # PATH B: Full scan (crawl → audit → score → report)
     # ---------------------------------------------------------------
     else:
         domain = args.domain
@@ -73,12 +71,23 @@ def main():
         print("Fetching homepage HTML for cookie banner detection...")
         homepage_html = fetch_page(normalize_url(domain)) or ""
 
-        # STAGE 3 — Audit
+        # STAGE 3 — Audit (also runs contact verification internally)
         audit_results = run_audit(crawl_result, homepage_html)
 
-        # STAGE 4 — Score
+        # STAGE 4 — Retrieve the full verification result that was
+        # cached inside auditor.py during the contact_authentic checks
+        # This gives us the rich data needed for the PDF report section
+        base_url            = crawl_result.get("base_url", "")
+        verification_result = get_verification_result(base_url)
+
+        # STAGE 5 — Score
         scan_duration = time.time() - scan_start
-        report = generate_score_report(crawl_result, audit_results, scan_duration)
+        report = generate_score_report(
+            crawl_result,
+            audit_results,
+            scan_duration,
+            verification_result   # ← passed through to the report dict
+        )
 
         # Print terminal summary
         print_score_summary(report)
@@ -92,11 +101,8 @@ def main():
         except OSError as e:
             print(f"  ✗ Could not save JSON: {e}")
 
-    # ---------------------------------------------------------------
-    # STAGE 5 — Generate PDF Report
-    # ---------------------------------------------------------------
+    # STAGE 6 — Generate PDF Report
     print("\n  Generating PDF report...")
-
     try:
         pdf_path = generate_pdf_report(report)
         print(f"  ✓ PDF report ready: {pdf_path}")
@@ -107,9 +113,6 @@ def main():
 
 
 def print_score_summary(report: dict):
-    """
-    Prints a clean, human-readable score summary to the terminal.
-    """
     score   = report["risk_score"]
     grade   = report["risk_grade"]
     level   = report["risk_level"]
@@ -148,6 +151,18 @@ def print_score_summary(report: dict):
         print(f"\n  TOP RECOMMENDATIONS:")
         for rec in recs[:3]:
             print(f"    • {rec[:55]}...")
+
+    # Print verification verdict if available
+    verification = report.get("verification")
+    if verification:
+        verdict = verification.get("overall_verdict", "unverified")
+        verdict_labels = {
+            "authentic":         "✅ AUTHENTIC",
+            "suspicious":        "⚠️  SUSPICIOUS",
+            "fake_detected":     "❌ FAKE/DUMMY DETECTED",
+            "no_contacts_found": "❓ NO CONTACTS FOUND",
+        }
+        print(f"\n  CONTACT VERIFICATION : {verdict_labels.get(verdict, verdict)}")
 
     print(f"\n{'=' * 60}\n")
 

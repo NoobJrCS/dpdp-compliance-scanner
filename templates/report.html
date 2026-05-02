@@ -390,6 +390,324 @@
         </tr>
     </table>
 </div>
+<!-- ============================================================ -->
+<!-- INSERT THIS BLOCK BETWEEN SCAN METADATA AND DISCLAIMER      -->
+<!-- Replace your existing Page 5 closing </div> with this,     -->
+<!-- then add your disclaimer after it.                          -->
+<!-- ============================================================ -->
+
+
+<!-- ============================================================ -->
+<!-- PAGE 6: CONTACT VERIFICATION                                 -->
+<!-- ============================================================ -->
+<div class="section page-break">
+    <div class="section-header">06 — Contact Authenticity Verification</div>
+
+    <p class="muted mb-8">
+        Automated verification of Grievance Officer contact details found
+        in the privacy policy. Checks include placeholder detection, DNS
+        resolution, MX records, SMTP reachability, domain consistency,
+        phone carrier validation, and historical comparison via Wayback Machine.
+    </p>
+
+    {% if report.verification %}
+
+        {% set v = report.verification %}
+
+        <!-- ── Overall Verdict Banner ──────────────────────────── -->
+        {% if v.overall_verdict == "authentic" %}
+        <div class="verdict-banner verdict-authentic">
+            <div class="verdict-title">✓ Authentic — Contact details appear genuine</div>
+            <div class="verdict-detail">
+                All automated checks passed. Contact information appears to be
+                real and actively maintained.
+            </div>
+        </div>
+
+        {% elif v.overall_verdict == "suspicious" %}
+        <div class="verdict-banner verdict-suspicious">
+            <div class="verdict-title">⚠ Suspicious — Contact details have concerns</div>
+            <div class="verdict-detail">
+                No definitive fakes detected, but one or more warnings require
+                manual review before treating contacts as verified.
+            </div>
+        </div>
+
+        {% elif v.overall_verdict == "fake_detected" %}
+        <div class="verdict-banner verdict-fake">
+            <div class="verdict-title">✗ Fake / Placeholder Detected</div>
+            <div class="verdict-detail">
+                One or more contact details are placeholder or dummy values.
+                This indicates the Grievance Officer information has not been
+                properly configured, which is a violation of Section 13 of
+                the DPDP Act 2023.
+            </div>
+        </div>
+
+        {% else %}
+        <div class="verdict-banner verdict-unknown">
+            <div class="verdict-title">? No Contact Details Found</div>
+            <div class="verdict-detail">
+                No Grievance Officer email, phone, or name could be extracted
+                from the crawled pages. Verification could not be performed.
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ── Email Verification ──────────────────────────────── -->
+        {% if v.email_checks %}
+        <div class="verify-subheader">Email Address Verification</div>
+
+        {% for ec in v.email_checks %}
+        <div class="verify-card no-break">
+            <div class="verify-card-header">{{ ec.email }}</div>
+            <div class="verify-card-body">
+                <table class="verify-check-table">
+
+                    <!-- Placeholder check -->
+                    <tr>
+                        <td class="verify-check-name">Placeholder Check</td>
+                        <td class="verify-check-result">
+                            {% if ec.checks.is_placeholder.passed %}
+                                <span class="icon-pass">✓</span>
+                            {% else %}
+                                <span class="icon-fail">✗</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ ec.checks.is_placeholder.reason }}
+                        </td>
+                    </tr>
+
+                    <!-- DNS domain check -->
+                    <tr>
+                        <td class="verify-check-name">Domain Exists (DNS)</td>
+                        <td class="verify-check-result">
+                            {% if ec.checks.domain_exists.passed %}
+                                <span class="icon-pass">✓</span>
+                            {% else %}
+                                <span class="icon-fail">✗</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ ec.checks.domain_exists.reason }}
+                        </td>
+                    </tr>
+
+                    <!-- MX record check -->
+                    <tr>
+                        <td class="verify-check-name">MX Records</td>
+                        <td class="verify-check-result">
+                            {% if ec.checks.mx_record.passed %}
+                                <span class="icon-pass">✓</span>
+                            {% else %}
+                                <span class="icon-fail">✗</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ ec.checks.mx_record.reason }}
+                        </td>
+                    </tr>
+
+                    <!-- SMTP reachability check -->
+                    <tr>
+                        <td class="verify-check-name">SMTP Reachability</td>
+                        <td class="verify-check-result">
+                            {% if ec.checks.smtp_reachable.passed %}
+                                {% if ec.checks.smtp_reachable.conclusive %}
+                                    <span class="icon-pass">✓</span>
+                                {% else %}
+                                    <span class="icon-info">–</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="icon-fail">✗</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ ec.checks.smtp_reachable.reason }}
+                            {% if not ec.checks.smtp_reachable.conclusive %}
+                                <span class="muted">(inconclusive — not penalised)</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- Domain consistency check -->
+                    <tr>
+                        <td class="verify-check-name">Domain Consistency</td>
+                        <td class="verify-check-result">
+                            {% if ec.checks.domain_consistency.warning %}
+                                <span class="icon-warn">⚠</span>
+                            {% else %}
+                                <span class="icon-pass">✓</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ ec.checks.domain_consistency.reason }}
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="verify-subheader">Email Address Verification</div>
+        <div class="no-contacts-box">No compliance-related email addresses found.</div>
+        {% endif %}
+
+
+        <!-- ── Phone Verification ──────────────────────────────── -->
+        {% if v.phone_checks %}
+        <div class="verify-subheader">Phone Number Verification</div>
+
+        {% for pc in v.phone_checks %}
+        <div class="verify-card no-break">
+            <div class="verify-card-header">+91 {{ pc.phone }}</div>
+            <div class="verify-card-body">
+                <table class="verify-check-table">
+
+                    <!-- Placeholder check -->
+                    <tr>
+                        <td class="verify-check-name">Placeholder Check</td>
+                        <td class="verify-check-result">
+                            {% if pc.checks.is_placeholder.passed %}
+                                <span class="icon-pass">✓</span>
+                            {% else %}
+                                <span class="icon-fail">✗</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ pc.checks.is_placeholder.reason }}
+                        </td>
+                    </tr>
+
+                    <!-- Carrier check -->
+                    <tr>
+                        <td class="verify-check-name">Carrier (TRAI Series)</td>
+                        <td class="verify-check-result">
+                            {% if pc.checks.carrier.warning is defined and pc.checks.carrier.warning %}
+                                <span class="icon-warn">⚠</span>
+                            {% elif pc.checks.carrier.passed %}
+                                <span class="icon-pass">✓</span>
+                            {% else %}
+                                <span class="icon-fail">✗</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ pc.checks.carrier.reason }}
+                            {% if pc.checks.carrier.operator %}
+                                <span class="operator-badge">
+                                    {{ pc.checks.carrier.operator }}
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+
+        <!-- ── Name Verification ───────────────────────────────── -->
+        {% if v.name_checks %}
+        <div class="verify-subheader">Officer Name Verification</div>
+
+        {% for nc in v.name_checks %}
+        <div class="verify-card no-break">
+            <div class="verify-card-header">{{ nc.name }}</div>
+            <div class="verify-card-body">
+                <table class="verify-check-table">
+                    <tr>
+                        <td class="verify-check-name">Placeholder Check</td>
+                        <td class="verify-check-result">
+                            {% if nc.checks.is_placeholder.passed %}
+                                <span class="icon-pass">✓</span>
+                            {% else %}
+                                <span class="icon-fail">✗</span>
+                            {% endif %}
+                        </td>
+                        <td class="verify-check-reason">
+                            {{ nc.checks.is_placeholder.reason }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+
+        <!-- ── Historical Verification ─────────────────────────── -->
+        {% if v.history and v.history.checked %}
+        <div class="verify-subheader">Historical Verification (Wayback Machine)</div>
+
+        {% if v.history.snapshot_found %}
+        <div class="history-block {% if v.history.emails_changed %}history-changed{% endif %}">
+            <div class="history-title">
+                {% if v.history.emails_changed %}
+                    ⚠ Contact details changed since archived snapshot
+                {% else %}
+                    ✓ Contact details consistent with historical snapshot
+                {% endif %}
+            </div>
+            <div class="history-detail">
+                {{ v.history.reason }}
+                {% if v.history.snapshot_url %}
+                <br>
+                <span class="muted">
+                    Snapshot date: {{ v.history.snapshot_date }} —
+                    Archive URL: {{ v.history.snapshot_url[:80] }}...
+                </span>
+                {% endif %}
+                {% if v.history.historical_emails %}
+                <br>
+                <span class="muted">
+                    Historical emails found:
+                    {{ v.history.historical_emails | join(", ") }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="no-contacts-box">
+            {{ v.history.reason or "No archived snapshot found for this site." }}
+        </div>
+        {% endif %}
+        {% endif %}
+
+
+        <!-- ── Failures & Warnings Summary ─────────────────────── -->
+        {% if v.failures or v.warnings %}
+        <div class="verify-subheader mt-16">Issues & Warnings Summary</div>
+
+        {% for failure in v.failures %}
+        <div style="padding: 4px 10px; margin-bottom: 4px;
+                    background: #fef2f2; border-left: 3px solid #ef4444;
+                    font-size: 8.5pt; color: #7f1d1d;">
+            ✗ {{ failure }}
+        </div>
+        {% endfor %}
+
+        {% for warning in v.warnings %}
+        <div style="padding: 4px 10px; margin-bottom: 4px;
+                    background: #fffbeb; border-left: 3px solid #f59e0b;
+                    font-size: 8.5pt; color: #78350f;">
+            ⚠ {{ warning }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+    {% else %}
+    <!-- Verification wasn't run (e.g. crawl failed entirely) -->
+    <div class="no-contacts-box">
+        Contact verification was not performed — no pages were successfully
+        crawled for this domain.
+    </div>
+    {% endif %}
+
+</div>
 
 
 <!-- ============================================================ -->

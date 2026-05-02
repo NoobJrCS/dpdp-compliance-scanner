@@ -13,8 +13,7 @@ except OSError:
     print("Run: python -m spacy download en_core_web_sm")
     SPACY_AVAILABLE = False
 
-# Module-level cache so verify_contacts() runs only ONCE per scan
-# regardless of how many contact_authentic rules exist
+# Module-level cache — verify_contacts() runs only ONCE per scan
 _verification_cache = {}
 
 
@@ -23,10 +22,6 @@ _verification_cache = {}
 # ---------------------------------------------------------------
 
 def check_page_exists(crawl_result: dict, target_keyword: str) -> bool:
-    """
-    Returns True if the crawler found at least one page whose
-    label contains the target_keyword.
-    """
     for label in crawl_result["pages_found"].keys():
         if target_keyword.lower() in label.lower():
             return True
@@ -34,10 +29,6 @@ def check_page_exists(crawl_result: dict, target_keyword: str) -> bool:
 
 
 def check_keyword_exact(text: str, keywords: list) -> bool:
-    """
-    Returns True if ANY of the keywords are found in the text.
-    Case-insensitive. Uses word boundaries to avoid partial matches.
-    """
     text_lower = text.lower()
     for keyword in keywords:
         pattern = r'\b' + re.escape(keyword.lower()) + r'\b'
@@ -47,24 +38,17 @@ def check_keyword_exact(text: str, keywords: list) -> bool:
 
 
 def check_keyword_context(text: str, keywords: list) -> bool:
-    """
-    Uses spaCy to find keywords within their sentence context.
-    Falls back to basic keyword search if spaCy isn't available.
-    """
     if not SPACY_AVAILABLE:
         text_lower = text.lower()
         return any(kw.lower() in text_lower for kw in keywords)
 
-    # Truncate very long texts — spaCy has memory limits
-    text_sample   = text[:30000]
+    text_sample    = text[:30000]
     text_lower_full = text.lower()
 
-    # First pass: quick substring check (fast path)
     for keyword in keywords:
         if keyword.lower() in text_lower_full:
             return True
 
-    # Second pass: spaCy sentence-level analysis
     doc = nlp(text_sample)
     keyword_roots = set()
     for keyword in keywords:
@@ -82,9 +66,6 @@ def check_keyword_context(text: str, keywords: list) -> bool:
 
 
 def check_email_pattern(text: str, patterns: list) -> bool:
-    """
-    Searches for email addresses matching the given regex patterns.
-    """
     text_lower = text.lower()
     for pattern in patterns:
         matches = re.findall(pattern, text_lower, re.IGNORECASE)
@@ -94,9 +75,6 @@ def check_email_pattern(text: str, patterns: list) -> bool:
 
 
 def check_homepage_html(homepage_html: str, keywords: list) -> bool:
-    """
-    Checks the raw homepage HTML for cookie consent-related elements.
-    """
     html_lower = homepage_html.lower()
     for keyword in keywords:
         if keyword.lower() in html_lower:
@@ -105,31 +83,17 @@ def check_homepage_html(homepage_html: str, keywords: list) -> bool:
 
 
 def check_contact_authentic(
-    rule_id:     str,
+    rule_id:      str,
     crawl_result: dict,
-    base_url:    str
+    base_url:     str
 ) -> bool:
     """
-    NEW CHECK TYPE: Verifies that contact details found in the policy
-    are real and not placeholder/dummy values.
-
-    Uses verifier.py to run 5 sub-checks:
-      1. Email is not a known placeholder
-      2. Email domain exists in DNS
-      3. Email domain matches company website
-      4. Name is not a known placeholder
-      5. Phone number is not a dummy value
-
-    Results are cached so verify_contacts() runs only once per scan,
-    regardless of how many contact_authentic rules exist (DPDP-11,
-    DPDP-12 both call this function but share the same result).
-
-    DPDP-11 checks email authenticity.
-    DPDP-12 checks name authenticity.
+    Routes DPDP-11 and DPDP-12 checks to verifier.py.
+    Caches the verification result so verify_contacts() only
+    runs once per scan regardless of how many rules use it.
     """
     global _verification_cache
 
-    # Run verification only once, cache the result
     if base_url not in _verification_cache:
         all_text = "\n\n".join(
             page["text"]
@@ -143,33 +107,39 @@ def check_contact_authentic(
     verification = _verification_cache.get(base_url)
 
     if verification is None:
-        return False  # No text to verify = treat as failed
-
-    verdict = verification.get("overall_verdict", "unverified")
+        return False
 
     # DPDP-11 — Email authenticity
     if rule_id == "DPDP-11":
-        # Pass if no email failures detected
+        if not verification.get("emails_found"):
+            return False
         email_failures = [
             f for f in verification.get("failures", [])
             if f.lower().startswith("email")
         ]
-        # Also pass if no emails found at all (DPDP-03 will handle the missing email case)
-        if not verification.get("emails_found"):
-            return False  # No email found to verify = fail
         return len(email_failures) == 0
 
     # DPDP-12 — Name authenticity
     if rule_id == "DPDP-12":
+        if not verification.get("names_found"):
+            return False
         name_failures = [
             f for f in verification.get("failures", [])
             if f.lower().startswith("name")
         ]
-        if not verification.get("names_found"):
-            return False  # No name found to verify = fail
         return len(name_failures) == 0
 
     return False
+
+
+def get_verification_result(base_url: str) -> dict | None:
+    """
+    Returns the cached verification result for a given URL.
+    Called by scanner.py after run_audit() to include the full
+    verification data in the report dictionary for the PDF.
+    Returns None if no verification was run (e.g. no pages crawled).
+    """
+    return _verification_cache.get(base_url)
 
 
 # ---------------------------------------------------------------
@@ -177,19 +147,14 @@ def check_contact_authentic(
 # ---------------------------------------------------------------
 
 def get_text_for_target(crawl_result: dict, target_page: str) -> str:
-    """
-    Returns the appropriate text based on the rule's target_page setting.
-    """
     pages = crawl_result.get("pages_found", {})
 
     if target_page == "homepage":
         return ""
-
     elif target_page == "any":
         return "\n\n---PAGE BREAK---\n\n".join(
             page["text"] for page in pages.values()
         )
-
     else:
         matched_texts = []
         for label, page_data in pages.items():
@@ -207,18 +172,13 @@ def run_audit(
     homepage_html: str = ""
 ) -> dict:
     """
-    Master audit function. Takes the crawler output and runs
-    every rule from rules.py against it.
-
-    Returns a dictionary of results, one entry per rule.
+    Runs all DPDP rules against the crawled content.
+    Returns a dict of {rule_id: {label, passed, severity, ...}}.
     """
-
-    # Reset the verification cache for this scan
     global _verification_cache
-    _verification_cache = {}
+    _verification_cache = {}  # Reset cache for each new scan
 
-    base_url = crawl_result.get("base_url", "")
-
+    base_url     = crawl_result.get("base_url", "")
     audit_results = {}
 
     print(f"\n{'=' * 60}")
@@ -236,7 +196,6 @@ def run_audit(
 
         text = get_text_for_target(crawl_result, target)
 
-        # Route to the correct check function
         if check_type == "page_exists":
             passed = check_page_exists(crawl_result, keywords[0])
 
@@ -255,7 +214,6 @@ def run_audit(
         elif check_type == "contact_authentic":
             passed = check_contact_authentic(rule_id, crawl_result, base_url)
 
-        # Store result
         audit_results[rule_id] = {
             "label":       rule["label"],
             "description": rule["description"],
