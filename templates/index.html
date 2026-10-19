@@ -18,6 +18,12 @@
                 <div class="logo-sub">Digital Personal Data Protection Act 2023 — India</div>
             </div>
         </div>
+        <div class="header-actions">
+            <button id="themeToggleBtn" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle color theme" title="Switch dark/light mode">
+                <span class="theme-icon" id="themeIcon">🌙</span>
+                <span class="theme-label" id="themeLabel">Dark Mode</span>
+            </button>
+        </div>
     </div>
 </header>
 
@@ -159,18 +165,32 @@
         </div>
 
         <!-- Checks table -->
-        <h3 class="section-label">All 12 DPDP Checks</h3>
-        <table class="checks-table">
-            <thead>
-                <tr>
-                    <th>Rule</th>
-                    <th>Check</th>
-                    <th>Severity</th>
-                    <th>Result</th>
-                </tr>
-            </thead>
-            <tbody id="checksBody"></tbody>
-        </table>
+        <div class="checks-header-row">
+            <div>
+                <h3 class="section-label" style="margin-bottom: 2px;">All 12 DPDP Checks</h3>
+                <span class="checks-sub-hint">Click any check to view legal context &amp; remediation advice</span>
+            </div>
+            <div class="table-filters" id="tableFilters">
+                <button class="filter-pill active" id="filter-all" onclick="filterChecks('all')">All (<span id="filterAllCount">12</span>)</button>
+                <button class="filter-pill" id="filter-failed" onclick="filterChecks('failed')">Failed (<span id="filterFailCount">0</span>)</button>
+                <button class="filter-pill" id="filter-passed" onclick="filterChecks('passed')">Passed (<span id="filterPassCount">0</span>)</button>
+                <button class="filter-pill" id="filter-critical" onclick="filterChecks('critical')">Critical/High (<span id="filterCritCount">0</span>)</button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="checks-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Rule</th>
+                        <th style="width: 47%;">Check</th>
+                        <th style="width: 18%;">Severity</th>
+                        <th style="width: 14%;">Result</th>
+                        <th style="width: 6%;"></th>
+                    </tr>
+                </thead>
+                <tbody id="checksBody"></tbody>
+            </table>
+        </div>
 
         <!-- Top deductions -->
         <h3 class="section-label" id="deductionsLabel" style="display:none">
@@ -217,19 +237,19 @@
             <!-- Trackers Sub-panel -->
             <div class="passive-subsection" id="passiveTrackersSection">
                 <div class="passive-subtitle">Trackers Firing Before Interaction</div>
-                <div id="passiveTrackersList"></div>
+                <div class="table-responsive" id="passiveTrackersList"></div>
             </div>
 
             <!-- Cookie Issues Sub-panel -->
             <div class="passive-subsection" id="passiveCookiesSection">
                 <div class="passive-subtitle">Cookie Flag Issues</div>
-                <div id="passiveCookiesList"></div>
+                <div class="table-responsive" id="passiveCookiesList"></div>
             </div>
 
             <!-- Security Headers Sub-panel -->
             <div class="passive-subsection" id="passiveHeadersSection">
                 <div class="passive-subtitle">Security Headers Status</div>
-                <div id="passiveHeadersList"></div>
+                <div class="table-responsive" id="passiveHeadersList"></div>
             </div>
 
             <!-- Form Issues Sub-panel (optional) -->
@@ -247,6 +267,9 @@
         <div class="actions-row">
             <button class="btn-download" id="downloadBtn" onclick="downloadPDF()">
                 ⬇ Download PDF Report
+            </button>
+            <button class="btn-secondary" id="copySummaryBtn" onclick="copyScanSummary()">
+                📋 Copy Summary
             </button>
             <button class="btn-new" onclick="newScan()">
                 ↺ New Scan
@@ -278,33 +301,35 @@
     {% if recent_scans %}
     <section class="card history-card">
         <h2 class="card-title">Recent Scans</h2>
-        <table class="history-table">
-            <thead>
-                <tr>
-                    <th>Domain</th>
-                    <th>Score</th>
-                    <th>Grade</th>
-                    <th>Scanned</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for scan in recent_scans %}
-                <tr>
-                    <td class="history-domain">{{ scan.domain }}</td>
-                    <td class="history-score">{{ scan.score }}</td>
-                    <td>
-                        <span class="grade-badge"
-                              style="background: {{ scan.color }}22;
-                                     color: {{ scan.color }};
-                                     border-color: {{ scan.color }}">
-                            {{ scan.grade }}
-                        </span>
-                    </td>
-                    <td class="history-date">{{ scan.created_at[:16].replace("T", " ") }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>Score</th>
+                        <th>Grade</th>
+                        <th>Scanned</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for scan in recent_scans %}
+                    <tr>
+                        <td class="history-domain">{{ scan.domain }}</td>
+                        <td class="history-score">{{ scan.score }}</td>
+                        <td>
+                            <span class="grade-badge"
+                                  style="background: {{ scan.color }}22;
+                                         color: {{ scan.color }};
+                                         border-color: {{ scan.color }}">
+                                {{ scan.grade }}
+                            </span>
+                        </td>
+                        <td class="history-date">{{ scan.created_at[:16].replace("T", " ") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
     {% endif %}
 
@@ -341,12 +366,14 @@
                 <div class="step-title">Report</div>
                 <div class="step-desc">
                     A weighted risk score (0–100) with A–F grade and
-                    a 7-page PDF audit report are generated.
+                    an executive PDF audit report are generated.
                 </div>
             </div>
         </div>
     </section>
 
+    <!-- Toast feedback element -->
+    <div id="toast" class="toast hidden"></div>
 </main>
 
 <!-- ── FOOTER ─────────────────────────────────────────────────── -->

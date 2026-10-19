@@ -10,16 +10,57 @@
 //   - PDF download trigger
 // ---------------------------------------------------------------
 
-let currentJobId = null;
-let eventSource  = null;
+let currentJobId     = null;
+let eventSource      = null;
+let currentScanResult = null;
+let activeCheckFilter = "all";
+
+
+// ── Theme (Dark / Light) ─────────────────────────────────────────
+
+function initTheme() {
+    const saved = localStorage.getItem("dpdp_theme");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const theme = saved || (prefersDark ? "dark" : "light");
+    applyTheme(theme);
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("dpdp_theme", theme);
+    const icon = el("themeIcon");
+    const label = el("themeLabel");
+    if (icon && label) {
+        if (theme === "dark") {
+            icon.textContent = "☀️";
+            label.textContent = "Light Mode";
+        } else {
+            icon.textContent = "🌙";
+            label.textContent = "Dark Mode";
+        }
+    }
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute("data-theme") || "light";
+    const next = current === "dark" ? "light" : "dark";
+    applyTheme(next);
+}
+
+// Initialize theme immediately
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTheme);
+} else {
+    initTheme();
+}
 
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-function show(id)   { document.getElementById(id).classList.remove("hidden"); }
-function hide(id)   { document.getElementById(id).classList.add("hidden"); }
+function show(id)   { const element = document.getElementById(id); if (element) element.classList.remove("hidden"); }
+function hide(id)   { const element = document.getElementById(id); if (element) element.classList.add("hidden"); }
 function el(id)     { return document.getElementById(id); }
-function text(id, v){ el(id).textContent = v; }
+function text(id, v){ const element = el(id); if (element) element.textContent = v; }
 
 
 // ── Prefill domain from chip button ─────────────────────────────
@@ -210,6 +251,7 @@ function updateProgress(data) {
 // ── Show results panel ───────────────────────────────────────────
 
 function showResults(data) {
+    currentScanResult = data;
     hide("progressCard");
     show("resultsCard");
 
@@ -253,23 +295,80 @@ function showResults(data) {
         show("verifyVerdict");
     }
 
-    // Checks table
+    // Interactive Checks table
     const tbody = el("checksBody");
     tbody.innerHTML = "";
-    Object.entries(data.checks).forEach(([ruleId, check]) => {
-        const row = document.createElement("tr");
+
+    const allEntries = Object.entries(data.checks || {});
+    let failCount = 0;
+    let passCount = 0;
+    let critCount = 0;
+
+    allEntries.forEach(([ruleId, check]) => {
+        if (check.passed) passCount++;
+        else failCount++;
+
+        const isCritOrHigh = check.severity === "Critical" || check.severity === "High";
+        if (isCritOrHigh) critCount++;
+
         const passBadge = check.passed
             ? '<span class="badge badge-pass">Pass</span>'
             : '<span class="badge badge-fail">Fail</span>';
         const sevBadge = `<span class="badge badge-${check.severity.toLowerCase()}">${check.severity}</span>`;
+
+        // Main clickable row
+        const row = document.createElement("tr");
+        row.className = `check-row ${check.passed ? 'check-pass' : 'check-fail'} ${isCritOrHigh ? 'check-critical-high' : ''}`;
+        row.id = `row-${ruleId}`;
+        row.setAttribute("onclick", `toggleCheckDetail('${ruleId}')`);
         row.innerHTML = `
-            <td><strong>${ruleId}</strong></td>
-            <td>${check.label}</td>
+            <td><strong class="rule-id-cell">${ruleId}</strong></td>
+            <td>
+                <div class="check-label-cell">
+                    <span>${escapeHtml(check.label)}</span>
+                </div>
+            </td>
             <td>${sevBadge}</td>
             <td>${passBadge}</td>
+            <td class="text-center"><span class="chevron" id="chevron-${ruleId}">▶</span></td>
         `;
         tbody.appendChild(row);
+
+        // Accordion detail drawer row
+        const detailRow = document.createElement("tr");
+        detailRow.className = "check-detail-row hidden";
+        detailRow.id = `detail-${ruleId}`;
+        detailRow.innerHTML = `
+            <td colspan="5">
+                <div class="check-detail-box">
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Legal Requirement (DPDP Act 2023):</span>
+                            <div class="detail-text">${escapeHtml(check.description || 'Statutory requirement under the DPDP Act 2023.')}</div>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Remediation Guidance:</span>
+                            <div class="detail-text rec-highlight">${escapeHtml(check.recommendation || 'Ensure compliant implementation in accordance with statutory guidelines.')}</div>
+                        </div>
+                        <div class="detail-meta-row">
+                            <span class="meta-tag"><strong>Method:</strong> ${escapeHtml((check.check_type || '').replace(/_/g, ' '))}</span>
+                            <span class="meta-tag"><strong>Points:</strong> ${check.points_deducted > 0 ? '−' + check.points_deducted + ' points' : '0 points deducted (Compliant)'}</span>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(detailRow);
     });
+
+    // Update filter counts
+    text("filterAllCount", allEntries.length);
+    text("filterFailCount", failCount);
+    text("filterPassCount", passCount);
+    text("filterCritCount", critCount);
+
+    // Apply current filter
+    filterChecks(activeCheckFilter || "all");
 
     // Score deductions
     if (data.deductions && data.deductions.length > 0) {
@@ -476,6 +575,138 @@ function showError(message) {
 }
 
 
+// ── Interactive Checks Filtering & Accordion ─────────────────────
+
+function filterChecks(type) {
+    activeCheckFilter = type;
+    ["all", "failed", "passed", "critical"].forEach(t => {
+        const btn = el(`filter-${t}`);
+        if (btn) {
+            if (t === type) btn.classList.add("active");
+            else btn.classList.remove("active");
+        }
+    });
+
+    const tbody = el("checksBody");
+    if (!tbody) return;
+
+    const rows = tbody.querySelectorAll(".check-row");
+    rows.forEach(row => {
+        const ruleId = row.id.replace("row-", "");
+        const detailRow = el(`detail-${ruleId}`);
+        let showRow = false;
+
+        if (type === "all") {
+            showRow = true;
+        } else if (type === "failed") {
+            showRow = row.classList.contains("check-fail");
+        } else if (type === "passed") {
+            showRow = row.classList.contains("check-pass");
+        } else if (type === "critical") {
+            showRow = row.classList.contains("check-critical-high");
+        }
+
+        if (showRow) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+            if (detailRow) detailRow.classList.add("hidden");
+            const chev = el(`chevron-${ruleId}`);
+            if (chev) chev.classList.remove("rotated");
+        }
+    });
+}
+
+function toggleCheckDetail(ruleId) {
+    const detailRow = el(`detail-${ruleId}`);
+    const chev = el(`chevron-${ruleId}`);
+    if (!detailRow) return;
+
+    if (detailRow.classList.contains("hidden")) {
+        detailRow.classList.remove("hidden");
+        if (chev) chev.classList.add("rotated");
+    } else {
+        detailRow.classList.add("hidden");
+        if (chev) chev.classList.remove("rotated");
+    }
+}
+
+
+// ── Copy Scan Summary ────────────────────────────────────────────
+
+function copyScanSummary() {
+    if (!currentScanResult) {
+        showToast("No scan results to copy yet.");
+        return;
+    }
+    const d = currentScanResult;
+    const lines = [
+        `🛡 DPDP Compliance Assessment — ${d.target_url}`,
+        `Score: ${d.score}/100 | Grade: ${d.grade} (${d.risk_level})`,
+        `Scanned on: ${d.scan_date} (Duration: ${d.duration}s)`,
+        `Compliance: ${d.passed} Passed / ${d.failed} Failed (${d.critical} Critical, ${d.high} High, ${d.medium} Medium)`,
+        d.verification_verdict ? `Grievance Officer: ${d.verification_verdict.replace(/_/g, " ").toUpperCase()}` : "",
+        "",
+        "Key Deductions & Violations:"
+    ];
+
+    if (d.deductions && d.deductions.length > 0) {
+        d.deductions.forEach(dec => {
+            lines.push(` • [−${dec.points_deducted} pts] ${dec.rule_id}: ${dec.label} (${dec.severity})`);
+        });
+    } else {
+        lines.push(" • All 12 statutory DPDP checks passed!");
+    }
+
+    if (d.passive_audit && d.passive_audit.status !== "inconclusive") {
+        const pa = d.passive_audit;
+        lines.push("");
+        lines.push("Pre-Consent Tracking & Security:");
+        lines.push(` • Trackers firing before consent: ${pa.tracker_requests ? pa.tracker_requests.length : 0}`);
+        lines.push(` • Cookie flag issues: ${pa.cookie_issues ? pa.cookie_issues.length : 0}`);
+        lines.push(` • Missing security headers: ${pa.missing_headers ? pa.missing_headers.length : 0}`);
+    }
+
+    const fullSummary = lines.filter(Boolean).join("\n");
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(fullSummary)
+            .then(() => showToast("✓ Audit summary copied to clipboard!"))
+            .catch(() => fallbackCopy(fullSummary));
+    } else {
+        fallbackCopy(fullSummary);
+    }
+}
+
+function fallbackCopy(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand("copy");
+        showToast("✓ Audit summary copied to clipboard!");
+    } catch (_) {
+        showToast("Copy failed — please copy manually.");
+    }
+    document.body.removeChild(textarea);
+}
+
+function showToast(message) {
+    const toast = el("toast");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.remove("hidden");
+    toast.classList.add("visible");
+    setTimeout(() => {
+        toast.classList.remove("visible");
+        setTimeout(() => toast.classList.add("hidden"), 300);
+    }, 2500);
+}
+
+
 // ── Download PDF ─────────────────────────────────────────────────
 
 function downloadPDF() {
@@ -490,6 +721,8 @@ function downloadPDF() {
 function newScan() {
     closeEventSource();
     currentJobId = null;
+    currentScanResult = null;
+    activeCheckFilter = "all";
 
     hide("resultsCard");
     hide("errorCard");

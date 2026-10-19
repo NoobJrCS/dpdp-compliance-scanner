@@ -12,67 +12,88 @@
 <!-- ============================================================ -->
 <div class="cover-page">
 
-    <div class="cover-logo-bar">
-        <div class="tool-name">DPDP COMPLIANCE SCANNER</div>
-        <div class="tool-tagline">
-            Automated audit tool for the Digital Personal Data Protection Act 2023
+    <div class="cover-header-band">
+        <table style="width:100%; border-collapse:collapse;">
+            <tr>
+                <td style="vertical-align:middle;">
+                    <div class="cover-brand-title">DPDP STATUTORY COMPLIANCE ASSESSMENT</div>
+                    <div class="cover-brand-sub">Digital Personal Data Protection Act, 2023 (Act No. 22 of 2023)</div>
+                </td>
+                <td style="text-align:right; vertical-align:middle;">
+                    <span class="classification-pill">CONFIDENTIAL AUDIT</span>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="cover-body">
+        <div class="cover-eyebrow">STATUTORY PRIVACY &amp; DATA GOVERNANCE EVALUATION</div>
+        <div class="cover-title">
+            {{ report.target_url | replace("https://", "") | replace("http://", "") }}
         </div>
+        <div class="cover-subtitle">Technical Compliance Assessment &amp; Statutory Risk Audit</div>
+
+        <!-- Corporate Scorecard Box -->
+        <div class="cover-scorecard-card">
+            <table class="cover-scorecard-table">
+                <tr>
+                    <td class="scorecard-gauge-cell">
+                        <div class="cover-score-block" style="border-color: {{ report.grade_color }}; color: {{ report.grade_color }};">
+                            <span class="score-number">{{ report.risk_score }}</span>
+                            <span class="score-label">/ 100</span>
+                        </div>
+                    </td>
+                    <td class="scorecard-details-cell">
+                        <div class="score-grade-badge" style="background: {{ report.grade_color }}18; color: {{ report.grade_color }}; border-color: {{ report.grade_color }};">
+                            GRADE {{ report.risk_grade }} &bull; {{ report.risk_level | upper }}
+                        </div>
+                        <div class="scorecard-statement">
+                            {% if report.risk_score >= 80 %}
+                                Substantial Statutory Compliance Demonstrated
+                            {% elif report.risk_score >= 60 %}
+                                Moderate Statutory Compliance — Priority Remediations Advised
+                            {% else %}
+                                High Statutory Non-Compliance — Urgent Corrective Action Required
+                            {% endif %}
+                        </div>
+                        <div class="scorecard-stats-line">
+                            <strong>{{ report.summary.passed }}</strong> of {{ report.summary.total_checks }} statutory checks passed &bull; 
+                            <strong>{{ report.summary.critical_failures }}</strong> critical &bull; 
+                            <strong>{{ report.summary.high_failures }}</strong> high-priority findings
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Meta Table -->
+        <table class="cover-meta-table">
+            <tr>
+                <td class="meta-key">Target Domain</td>
+                <td class="meta-value">{{ report.target_url }}</td>
+            </tr>
+            <tr>
+                <td class="meta-key">Assessment Date</td>
+                <td class="meta-value">{{ report.scan_date }} (Duration: {{ report.scan_duration_seconds }}s)</td>
+            </tr>
+            <tr>
+                <td class="meta-key">Statutory Framework</td>
+                <td class="meta-value">Digital Personal Data Protection Act, 2023 (DPDP Act, Act No. 22 of 2023)</td>
+            </tr>
+            <tr>
+                <td class="meta-key">Audit Scope</td>
+                <td class="meta-value">Public Privacy Notices, Pre-Consent Tracking, Grievance Framework</td>
+            </tr>
+            <tr>
+                <td class="meta-key">Inspection Engine</td>
+                <td class="meta-value">Playwright Chromium + spaCy NLP Verification</td>
+            </tr>
+            <tr>
+                <td class="meta-key">Report Classification</td>
+                <td class="meta-value"><strong>Confidential &amp; Privileged Compliance Assessment</strong></td>
+            </tr>
+        </table>
     </div>
-
-    <div class="cover-document-type">Compliance Audit Report</div>
-
-    <div class="cover-title">
-        {{ report.target_url | replace("https://", "") | replace("http://", "") }}
-    </div>
-
-    <div class="cover-subtitle">DPDP Act 2023 — Compliance Assessment</div>
-
-    <!-- Score Circle -->
-    <div class="cover-score-block" 
-         style="border-color: {{ report.grade_color }}; 
-                color: {{ report.grade_color }};">
-        <span class="score-number">{{ report.risk_score }}</span>
-        <span class="score-label">/ 100</span>
-    </div>
-    <br>
-
-    <div class="cover-grade" style="color: {{ report.grade_color }};">
-        Grade {{ report.risk_grade }}
-    </div>
-
-    <div class="cover-risk-level">{{ report.risk_level }}</div>
-
-    <!-- Meta Table -->
-    <table class="cover-meta-table">
-        <tr>
-            <td class="meta-key">Target URL</td>
-            <td class="meta-value">{{ report.target_url }}</td>
-        </tr>
-        <tr>
-            <td class="meta-key">Scan Date</td>
-            <td class="meta-value">{{ report.scan_date }}</td>
-        </tr>
-        <tr>
-            <td class="meta-key">Scan Duration</td>
-            <td class="meta-value">{{ report.scan_duration_seconds }}s</td>
-        </tr>
-        <tr>
-            <td class="meta-key">Total Checks</td>
-            <td class="meta-value">{{ report.summary.total_checks }} rules evaluated</td>
-        </tr>
-        <tr>
-            <td class="meta-key">Framework</td>
-            <td class="meta-value">
-                Digital Personal Data Protection Act, 2023 (India)
-            </td>
-        </tr>
-        <tr>
-            <td class="meta-key">Audit Confidence</td>
-            <td class="meta-value">
-                {{ report.audit_confidence | default("High") | capitalize }}
-            </td>
-        </tr>
-    </table>
 
 </div>
 

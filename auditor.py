@@ -226,11 +226,12 @@ def run_audit(
             passed = check_contact_authentic(rule_id, crawl_result, base_url)
 
         audit_results[rule_id] = {
-            "label":       rule["label"],
-            "description": rule["description"],
-            "severity":    rule["severity"],
-            "passed":      passed,
-            "check_type":  check_type
+            "label":          rule["label"],
+            "description":    rule["description"],
+            "severity":       rule["severity"],
+            "passed":         passed,
+            "check_type":     check_type,
+            "recommendation": rule.get("recommendation", "")
         }
 
         status_icon = "[PASS]" if passed else "[FAIL]"
