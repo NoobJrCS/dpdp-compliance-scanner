@@ -94,9 +94,10 @@ def check_homepage_html(homepage_html: str, keywords: list) -> bool:
 
 
 def check_contact_authentic(
-    rule_id:      str,
-    crawl_result: dict,
-    base_url:     str
+    rule_id:          str,
+    crawl_result:     dict,
+    base_url:         str,
+    prospecting_mode: bool = True
 ) -> bool:
     """
     Routes DPDP-11 and DPDP-12 checks to verifier.py.
@@ -113,7 +114,9 @@ def check_contact_authentic(
         if not all_text:
             _verification_cache[base_url] = None
         else:
-            _verification_cache[base_url] = verify_contacts(all_text, base_url)
+            _verification_cache[base_url] = verify_contacts(
+                all_text, base_url, prospecting_mode=prospecting_mode
+            )
 
     verification = _verification_cache.get(base_url)
 
@@ -179,8 +182,9 @@ def get_text_for_target(crawl_result: dict, target_page: str) -> str:
 # ---------------------------------------------------------------
 
 def run_audit(
-    crawl_result:  dict,
-    homepage_html: str = ""
+    crawl_result:     dict,
+    homepage_html:    str = "",
+    prospecting_mode: bool = True
 ) -> dict:
     """
     Runs all DPDP rules against the crawled content.
@@ -223,7 +227,7 @@ def run_audit(
             passed = check_homepage_html(homepage_html, keywords) if homepage_html else False
 
         elif check_type == "contact_authentic":
-            passed = check_contact_authentic(rule_id, crawl_result, base_url)
+            passed = check_contact_authentic(rule_id, crawl_result, base_url, prospecting_mode=prospecting_mode)
 
         audit_results[rule_id] = {
             "label":          rule["label"],

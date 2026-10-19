@@ -25,6 +25,7 @@
 # ---------------------------------------------------------------
 
 import sys
+import re
 import json
 import time
 import argparse
@@ -105,40 +106,47 @@ TRACKER_RULES = [
     ("sentry.io",                 None,   "Sentry",                  "monitoring"),
 ]
 
-# Cookie-name patterns that indicate tracking/analytics cookies
+# Cookie-name patterns that indicate tracking/analytics or monitoring cookies
+# Format: (name_prefix, vendor, category)
 TRACKER_COOKIE_PATTERNS = [
-    ("_ga",        "Google Analytics"),
-    ("_gid",       "Google Analytics"),
-    ("_gat",       "Google Analytics"),
-    ("__utm",      "Google Analytics (legacy)"),
-    ("_gcl_",      "Google Ads"),
-    ("_fbp",       "Meta Pixel"),
-    ("_fbc",       "Meta Pixel"),
-    ("_clck",      "Microsoft Clarity"),
-    ("_clsk",      "Microsoft Clarity"),
-    ("_hjsession", "Hotjar"),
-    ("_hjsessionuser", "Hotjar"),
-    ("_hjid",      "Hotjar"),
-    ("mp_",        "Mixpanel"),
-    ("ajs_",       "Segment"),
-    ("amplitude",  "Amplitude"),
-    ("wzrk_",      "CleverTap"),
-    ("_li_",       "LinkedIn"),
-    ("_ttp",       "TikTok"),
-    ("s_cc",       "Adobe Analytics"),
-    ("s_sq",       "Adobe Analytics"),
-    ("s_vi",       "Adobe Analytics"),
-    ("s_fid",      "Adobe Analytics"),
-    ("demdex",     "Adobe Audience Manager"),
-    ("aam_",       "Adobe Audience Manager"),
-    ("_dd_s",      "Datadog RUM"),
-    ("nreum",      "New Relic"),
+    ("_ga",        "Google Analytics",         "analytics"),
+    ("_gid",       "Google Analytics",         "analytics"),
+    ("_gat",       "Google Analytics",         "analytics"),
+    ("__utm",      "Google Analytics (legacy)","analytics"),
+    ("_gcl_",      "Google Ads",               "advertising"),
+    ("_fbp",       "Meta Pixel",               "advertising"),
+    ("_fbc",       "Meta Pixel",               "advertising"),
+    ("_clck",      "Microsoft Clarity",        "session_replay"),
+    ("_clsk",      "Microsoft Clarity",        "session_replay"),
+    ("_hjsession", "Hotjar",                   "session_replay"),
+    ("_hjsessionuser", "Hotjar",               "session_replay"),
+    ("_hjid",      "Hotjar",                   "session_replay"),
+    ("mp_",        "Mixpanel",                 "analytics"),
+    ("ajs_",       "Segment",                  "analytics"),
+    ("amplitude",  "Amplitude",                "analytics"),
+    ("wzrk_",      "CleverTap",                "analytics"),
+    ("_li_",       "LinkedIn",                 "advertising"),
+    ("_ttp",       "TikTok",                   "advertising"),
+    ("s_cc",       "Adobe Analytics",          "analytics"),
+    ("s_sq",       "Adobe Analytics",          "analytics"),
+    ("s_vi",       "Adobe Analytics",          "analytics"),
+    ("s_fid",      "Adobe Analytics",          "analytics"),
+    ("demdex",     "Adobe Audience Manager",   "analytics"),
+    ("aam_",       "Adobe Audience Manager",   "analytics"),
+    ("_dd_s",      "Datadog RUM",              "monitoring"),
+    ("nreum",      "New Relic",                "monitoring"),
 ]
 
-# Cookie names that look like session/auth cookies — only these are
-# expected to carry HttpOnly (JS-set cookies cannot be HttpOnly, so
-# flagging every cookie would create false positives).
-SESSION_COOKIE_HINTS = ("sess", "sid", "token", "auth", "jwt", "login")
+# Cookie names that look like session or authentication tokens.
+# JavaScript-set cookies (e.g. client tracking or UI state) can NEVER carry
+# the HttpOnly flag by design. Only genuine server-side session/auth cookies
+# (e.g. PHPSESSID, JSESSIONID, auth_token, session_id, sid) should be
+# evaluated for missing HttpOnly to avoid false positives.
+SESSION_COOKIE_REGEX = re.compile(
+    r'(^|[_\-.])(sess|session|sessionid|sid|token|auth|jwt|login|authtoken|user_session)([_\-.]|$)'
+    r'|(^)(phpsessid|jsessionid|asp\.net_sessionid|connect\.sid)($)',
+    re.IGNORECASE
+)
 
 SECURITY_HEADERS = [
     ("strict-transport-security", "HSTS",
@@ -221,10 +229,12 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
         "main_status":      None,          # HTTP status of main document
         "page_title":       "",
         "total_requests":   0,
-        "tracker_requests": [],   # third-party requests matching tracker list
-        "tracker_cookies":  [],   # cookies matching tracker patterns
-        "cookie_issues":    [],   # missing Secure / SameSite / HttpOnly (session-like)
-        "missing_headers":  [],
+        "tracker_requests":    [],   # third-party requests matching tracker list (excluding monitoring)
+        "monitoring_requests": [],   # APM & diagnostics requests (New Relic, Sentry, Datadog)
+        "tracker_cookies":     [],   # cookies matching tracker patterns (excluding monitoring)
+        "monitoring_cookies":  [],   # cookies matching APM/monitoring patterns
+        "cookie_issues":       [],   # missing Secure / SameSite / HttpOnly (session-like)
+        "missing_headers":     [],
         "form_issues":      [],
         "all_third_party_hosts": [],
         "limitations": [
@@ -268,6 +278,7 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
 
             # ── 1. Tracker requests (before any interaction) ───────────
             tracker_hits = {}
+            monitoring_hits = {}
             third_party_hosts = set()
             for req_url, rtype in seen_requests:
                 if not req_url.startswith(("http://", "https://")):
@@ -277,14 +288,24 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
                     m = match_tracker(req_url)
                     if m:
                         name, category = m
-                        entry = tracker_hits.setdefault(name, {
-                            "name": name, "category": category,
-                            "request_count": 0, "example_url": req_url[:200],
-                        })
-                        entry["request_count"] += 1
+                        if category == "monitoring":
+                            entry = monitoring_hits.setdefault(name, {
+                                "name": name, "category": category,
+                                "request_count": 0, "example_url": req_url[:200],
+                            })
+                            entry["request_count"] += 1
+                        else:
+                            entry = tracker_hits.setdefault(name, {
+                                "name": name, "category": category,
+                                "request_count": 0, "example_url": req_url[:200],
+                            })
+                            entry["request_count"] += 1
 
             result["tracker_requests"] = sorted(
                 tracker_hits.values(), key=lambda e: (e["category"], e["name"])
+            )
+            result["monitoring_requests"] = sorted(
+                monitoring_hits.values(), key=lambda e: e["name"]
             )
             result["all_third_party_hosts"] = sorted(h for h in third_party_hosts if h)
 
@@ -295,12 +316,19 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
             for c in cookies:
                 name_l = c["name"].lower()
 
-                for pattern, vendor in TRACKER_COOKIE_PATTERNS:
+                for entry in TRACKER_COOKIE_PATTERNS:
+                    pattern = entry[0]
+                    vendor = entry[1]
+                    cat = entry[2] if len(entry) > 2 else "analytics"
                     if name_l.startswith(pattern):
-                        result["tracker_cookies"].append({
+                        cookie_entry = {
                             "name": c["name"], "vendor": vendor,
-                            "domain": c["domain"],
-                        })
+                            "domain": c["domain"], "category": cat,
+                        }
+                        if cat == "monitoring":
+                            result["monitoring_cookies"].append(cookie_entry)
+                        else:
+                            result["tracker_cookies"].append(cookie_entry)
                         break
 
                 issues = []
@@ -308,7 +336,8 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
                     issues.append("missing Secure flag")
                 if c.get("sameSite") in (None, "None") and not c.get("secure"):
                     issues.append("SameSite not restricted")
-                if any(h in name_l for h in SESSION_COOKIE_HINTS) and not c.get("httpOnly"):
+                # JavaScript-set cookies cannot carry HttpOnly; only check session/auth cookies
+                if SESSION_COOKIE_REGEX.search(name_l) and not c.get("httpOnly"):
                     issues.append("session-like cookie without HttpOnly")
                 if issues:
                     result["cookie_issues"].append({
@@ -429,17 +458,22 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
 def summarise(result: dict) -> dict:
     tr_cnt = len(result["tracker_requests"])
     tc_cnt = len(result["tracker_cookies"])
+    mr_cnt = len(result.get("monitoring_requests", []))
+    mc_cnt = len(result.get("monitoring_cookies", []))
     cf_cnt = len(result["cookie_issues"])
     mh_cnt = len(result["missing_headers"])
     fi_cnt = len(result["form_issues"])
     return {
         "trackers_before_interaction": tr_cnt,
         "tracker_cookies":             tc_cnt,
+        "monitoring_requests_count":   mr_cnt,
+        "monitoring_cookies_count":    mc_cnt,
         "cookie_flag_issues":          cf_cnt,
         "missing_security_headers":    mh_cnt,
         "form_issues":                 fi_cnt,
         "trackers_count":              tr_cnt,
         "tracker_cookies_count":       tc_cnt,
+        "monitoring_count":            mr_cnt,
         "cookie_issues_count":         cf_cnt,
         "missing_headers_count":       mh_cnt,
         "form_issues_count":           fi_cnt,
@@ -471,6 +505,8 @@ def print_report(r: dict):
     s = r["summary"]
     print(f"\n  Trackers firing before any interaction : {s['trackers_before_interaction']}")
     print(f"  Tracker cookies set before interaction : {s['tracker_cookies']}")
+    if s.get("monitoring_count", 0) > 0:
+        print(f"  Monitoring tools active (APM / RUM)   : {s['monitoring_count']} (diagnostics — excluded from ad tracker count)")
     print(f"  Cookie flag issues                     : {s['cookie_flag_issues']}")
     print(f"  Missing security headers               : {s['missing_security_headers']}")
     print(f"  Form issues                            : {s['form_issues']}")
@@ -479,9 +515,17 @@ def print_report(r: dict):
         print("\n  TRACKER REQUESTS (fired before any click):")
         for t in r["tracker_requests"]:
             print(f"    • {t['name']:<26} [{t['category']}]  x{t['request_count']}")
+    if r.get("monitoring_requests"):
+        print("\n  PERFORMANCE MONITORING / APM TOOLS (diagnostics — not ad trackers):")
+        for m in r["monitoring_requests"]:
+            print(f"    • {m['name']:<26} [{m['category']}]  x{m['request_count']}")
     if r["tracker_cookies"]:
         print("\n  TRACKER COOKIES (present before any click):")
         for c in r["tracker_cookies"]:
+            print(f"    • {c['name']:<20} {c['vendor']}")
+    if r.get("monitoring_cookies"):
+        print("\n  MONITORING COOKIES (diagnostics):")
+        for c in r["monitoring_cookies"]:
             print(f"    • {c['name']:<20} {c['vendor']}")
     if r["cookie_issues"]:
         print("\n  COOKIE FLAG ISSUES:")

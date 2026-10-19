@@ -425,9 +425,9 @@
     <div class="section-header">06 — Contact Authenticity Verification</div>
 
     <p class="muted mb-8">
-        Automated verification of Grievance Officer contact details found
+        Automated verification of Data Protection Officer (DPO) and Grievance contact details found
         in the privacy policy. Checks include placeholder detection, DNS
-        resolution, MX records, SMTP reachability, domain consistency,
+        resolution, MX records, SMTP deliverability (client mode), domain consistency,
         phone carrier validation, and historical comparison via Wayback Machine.
     </p>
 
@@ -459,8 +459,8 @@
             <div class="verdict-title">✗ Fake / Placeholder Detected</div>
             <div class="verdict-detail">
                 One or more contact details are placeholder or dummy values.
-                This indicates the Grievance Officer information has not been
-                properly configured, which is a violation of Section 13 of
+                This indicates the DPO or grievance contact information has not been
+                properly published, in contravention of Sections 8(9) and 13 of
                 the DPDP Act 2023.
             </div>
         </div>
@@ -469,7 +469,7 @@
         <div class="verdict-banner verdict-unknown">
             <div class="verdict-title">? No Contact Details Found</div>
             <div class="verdict-detail">
-                No Grievance Officer email, phone, or name could be extracted
+                No DPO or grievance contact email, phone, or name could be extracted
                 from the crawled pages. Verification could not be performed.
             </div>
         </div>
@@ -545,8 +545,9 @@
                             {% endif %}
                         </td>
                         <td class="verify-check-reason">
-                            {{ ec.checks.smtp_reachable.reason }}
-                            {% if not ec.checks.smtp_reachable.conclusive %}
+                            {% if ec.checks.smtp_reachable.skipped %}
+                                <span class="muted">(prospecting mode — passive audit)</span>
+                            {% elif not ec.checks.smtp_reachable.conclusive %}
                                 <span class="muted">(inconclusive — not penalised)</span>
                             {% endif %}
                         </td>
@@ -818,6 +819,38 @@
         <div class="no-contacts-box mb-16" style="border-style: solid; border-color: #bbf7d0; background: #f0fdf4; color: #166534;">
             ✓ No known third-party tracking scripts fired before user interaction.
         </div>
+        {% endif %}
+
+        <!-- 1.5 Monitoring & Diagnostics Section -->
+        {% if pa.monitoring_requests %}
+        <div class="verify-subheader mt-16">Operational Monitoring &amp; Telemetry (Excluded from Ad Tracker Count)</div>
+        <p class="muted mb-8" style="font-size: 8pt;">
+            The following services capture technical application telemetry, error tracking, or performance metrics (APM / RUM). They are engineering diagnostics rather than commercial advertising scripts and are tracked separately.
+        </p>
+        <table class="checks-table mb-16">
+            <thead>
+                <tr>
+                    <th style="width: 32%;">Monitoring Service</th>
+                    <th style="width: 20%;">Type</th>
+                    <th style="width: 14%;">Requests</th>
+                    <th style="width: 34%;">Target Endpoint / Resource</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in pa.monitoring_requests %}
+                <tr>
+                    <td><strong>{{ m.name }}</strong></td>
+                    <td>
+                        <span class="operator-badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">Diagnostic (APM)</span>
+                    </td>
+                    <td style="text-align: center; font-weight: 600;">{{ m.request_count }}x</td>
+                    <td style="font-size: 7.5pt; color: #4b5563; word-break: break-all;">
+                        {{ m.example_url[:80] }}{% if m.example_url | length > 80 %}...{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% endif %}
 
         <!-- 2. Cookie Flag Security Issues -->

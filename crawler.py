@@ -104,45 +104,11 @@ def normalize_url(domain: str) -> str:
     return f"https://{domain}"
 
 
-def fetch_page_http(url: str, timeout: int = 12) -> str | None:
-    """
-    Direct HTTP fallback using standard Python urllib.
-    Used when Playwright Chromium encounters net::ERR_HTTP2_PROTOCOL_ERROR
-    or stream resets on WAF/CDN protected sites.
-    """
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
-    req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            if resp.status == 200:
-                html = resp.read().decode("utf-8", errors="replace")
-                soup = BeautifulSoup(html, "lxml")
-                title = soup.title.string.strip() if soup.title and soup.title.string else ""
-                title_l = title.lower()
-                for bt in BLOCKED_TITLES:
-                    if bt in title_l:
-                        print(f"  [BLOCKED] Bot challenge detected in HTTP fallback ('{title}'): {url}")
-                        return None
-                return html
-    except Exception as e:
-        print(f"  [ERROR] Direct HTTP fetch failed for {url}: {e}")
-        return None
-    return None
-
-
 def fetch_page(url: str, timeout_ms: int = 15000, retries: int = 2) -> str | None:
     """
     Uses Playwright (headless Chromium) to fetch a fully JS-rendered page.
-    Falls back to direct HTTP (urllib) if Playwright encounters protocol errors
-    (e.g. net::ERR_HTTP2_PROTOCOL_ERROR on WAFs).
+    If the site resets the connection or refuses automated access (e.g. WAF/CDN challenge),
+    returns None so the audit treats the domain cleanly as inconclusive.
     """
     for attempt in range(retries + 1):
         with sync_playwright() as p:
@@ -186,23 +152,11 @@ def fetch_page(url: str, timeout_ms: int = 15000, retries: int = 2) -> str | Non
                     time.sleep(wait)
                 else:
                     print(f"  [TIMEOUT] Playwright attempts failed: {url}")
-                    print(f"  [FALLBACK] Attempting direct HTTP fallback for: {url}")
-                    http_html = fetch_page_http(url)
-                    if http_html:
-                        print(f"  [OK] Successfully retrieved page via HTTP fallback: {url}")
-                        return http_html
                     return None
 
             except Exception as e:
                 err_str = str(e)
                 print(f"  [ERROR] Playwright could not fetch {url}: {err_str}")
-                # If network or HTTP2 protocol error or connection reset, try HTTP fallback
-                if "ERR_HTTP2" in err_str or "ERR_CONNECTION" in err_str or "ERR_SSL" in err_str:
-                    print(f"  [FALLBACK] Attempting direct HTTP fallback for: {url}")
-                    http_html = fetch_page_http(url)
-                    if http_html:
-                        print(f"  [OK] Successfully retrieved page via HTTP fallback: {url}")
-                        return http_html
                 return None
 
             finally:
@@ -349,10 +303,10 @@ def run_crawler(domain: str) -> dict:
     homepage_html = fetch_page(base_url)
 
     if not homepage_html:
-        result["errors"].append("Could not fetch homepage (blocked by bot protection or unreachable).")
+        result["errors"].append("Could not fetch homepage (automated access blocked by bot protection or connection reset).")
         result["blocked"] = True
-        result["blocked_reason"] = "Site appears to be protected by a bot-detection challenge (e.g. Akamai, Cloudflare, or WAF)."
-        print("  [!] Crawl stopped: Homepage could not be retrieved.\n")
+        result["blocked_reason"] = "Site connection was reset or automated access was refused (e.g. CDN/WAF bot-protection challenge or HTTP/2 reset). Scan treated as inconclusive."
+        print("  [!] Crawl stopped: Automated access was refused by target.\n")
         return result
 
     print(f"  [OK] Homepage loaded successfully.\n")

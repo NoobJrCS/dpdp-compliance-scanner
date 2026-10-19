@@ -264,12 +264,15 @@ def check_mx_record(email: str) -> dict:
 
 _PORT_25_BLOCKED = False
 
-def check_smtp_reachable(email: str) -> dict:
+def check_smtp_reachable(email: str, enabled: bool = True) -> dict:
     """
     Check 4: SMTP Reachability Check.
 
     Performs a real SMTP handshake to verify the email address
     is accepted by the mail server — WITHOUT sending any email.
+
+    When enabled=False (prospecting mode), skips active port 25 connection
+    to maintain a strictly non-intrusive posture on unsolicited scans.
 
     Steps:
       1. Looks up MX record to find the mail server
@@ -283,6 +286,14 @@ def check_smtp_reachable(email: str) -> dict:
       550 = Address rejected  -> FAIL (mailbox doesn't exist)
       Other / timeout         -> INCONCLUSIVE (not a failure)
     """
+    if not enabled:
+        return {
+            "passed":     True,
+            "conclusive": False,
+            "skipped":    True,
+            "reason":     "SMTP probe skipped (prospecting mode — passive verification only; active port 25 probe reserved for authorized client audits)."
+        }
+
     global _PORT_25_BLOCKED
     if _PORT_25_BLOCKED:
         return {
@@ -601,20 +612,26 @@ def check_wayback_history(base_url: str, current_emails: list) -> dict:
 # MASTER VERIFIER
 # ---------------------------------------------------------------
 
-def verify_contacts(text: str, base_url: str) -> dict:
+def verify_contacts(text: str, base_url: str, prospecting_mode: bool = True) -> dict:
     """
     Master function. Extracts all contact details and runs
     all authenticity checks on each one.
 
+    When prospecting_mode=True (default), skips active SMTP socket probes
+    (RCPT TO) on port 25, performing passive DNS, MX, domain consistency,
+    and Wayback Machine checks only.
+
     Returns a complete structured verification report.
     """
-    print("  Running contact authenticity verification...")
+    mode_str = "prospecting mode — passive verification only" if prospecting_mode else "client mode — full SMTP socket probing enabled"
+    print(f"  Running contact authenticity verification [{mode_str}]...")
 
     emails = extract_emails(text)
     phones = extract_phone_numbers(text)
     names  = extract_person_names(text)
 
     results = {
+        "prospecting_mode": prospecting_mode,
         "emails_found":    emails,
         "phones_found":    phones,
         "names_found":     names,
@@ -632,7 +649,7 @@ def verify_contacts(text: str, base_url: str) -> dict:
         ph   = check_email_placeholder(email)
         de   = check_email_domain_exists(email)
         mx   = check_mx_record(email)
-        smtp = check_smtp_reachable(email)
+        smtp = check_smtp_reachable(email, enabled=not prospecting_mode)
         dc   = check_email_domain_consistency(email, base_url)
 
         results["email_checks"].append({

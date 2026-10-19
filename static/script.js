@@ -440,6 +440,38 @@ function showResults(data) {
             trList.appendChild(table);
         }
 
+        // Monitoring / APM tools (separate section)
+        if (pa.monitoring_requests && pa.monitoring_requests.length > 0) {
+            const monBox = document.createElement("div");
+            monBox.style.marginTop = "12px";
+            monBox.style.paddingTop = "8px";
+            monBox.style.borderTop = "1px dashed var(--border-color, #e2e8f0)";
+            monBox.innerHTML = `
+                <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted, #64748b); margin-bottom: 6px;">
+                    🔧 Performance Monitoring (APM / Diagnostics — Excluded from Tracker Count):
+                </div>
+                <table class="passive-mini-table">
+                    <thead>
+                        <tr>
+                            <th>Diagnostic Tool</th>
+                            <th>Role</th>
+                            <th>Requests</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${pa.monitoring_requests.map(m => `
+                            <tr>
+                                <td><strong>${escapeHtml(m.name)}</strong></td>
+                                <td><span class="category-badge" style="background: rgba(100, 116, 139, 0.12); color: var(--text-muted, #64748b);">diagnostics</span></td>
+                                <td><span class="req-count-badge">${m.request_count || 1}x</span></td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            `;
+            trList.appendChild(monBox);
+        }
+
         // Cookie issues list
         const ckList = el("passiveCookiesList");
         ckList.innerHTML = "";

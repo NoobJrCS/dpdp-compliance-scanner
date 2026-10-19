@@ -87,13 +87,14 @@ def push(job_id: str, event: str, data: dict):
             })
 
 
-def run_scan(job_id: str, domain: str):
+def run_scan(job_id: str, domain: str, client_mode: bool = False):
     """
     The full scanner pipeline, run in a background thread.
     Pushes progress events to the SSE queue at each stage.
     """
     import time
     scan_start = time.time()
+    prospecting_mode = not client_mode
 
     try:
         with jobs_lock:
@@ -207,7 +208,7 @@ def run_scan(job_id: str, domain: str):
             "percent": 50
         })
 
-        audit_results = run_audit(crawl_result, homepage_html)
+        audit_results = run_audit(crawl_result, homepage_html, prospecting_mode=prospecting_mode)
 
         passed = sum(1 for r in audit_results.values() if r["passed"])
         failed = len(audit_results) - passed
@@ -219,9 +220,14 @@ def run_scan(job_id: str, domain: str):
         })
 
         # ── STAGE 5: Contact Verification ───────────────────────
+        verify_msg = (
+            "🔎 Verifying contact authenticity (DNS, MX, Wayback Machine — prospecting mode)..."
+            if prospecting_mode else
+            "🔎 Verifying contact authenticity (DNS, MX, SMTP socket probe, Wayback Machine — client mode)..."
+        )
         push(job_id, "progress", {
             "stage":   "verify",
-            "message": "🔎 Verifying contact authenticity (DNS, SMTP, Wayback Machine)...",
+            "message": verify_msg,
             "percent": 65
         })
 
@@ -384,15 +390,17 @@ def start_scan():
 
     job_id = create_job(domain)
 
+    client_mode = bool(data.get("client_mode", False))
+
     # Start scan in background thread so the response returns immediately
     thread = threading.Thread(
         target=run_scan,
-        args=(job_id, domain),
+        args=(job_id, domain, client_mode),
         daemon=True
     )
     thread.start()
 
-    return jsonify({"job_id": job_id, "domain": domain})
+    return jsonify({"job_id": job_id, "domain": domain, "client_mode": client_mode})
 
 
 @app.route("/progress/<job_id>")

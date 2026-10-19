@@ -1,4 +1,13 @@
 # rules.py
+# ---------------------------------------------------------------------------
+# DPDP Compliance Scanner — Statutory Audit Rules
+#
+# Scoring & Severity Heuristic Note:
+# The point values (summing to exactly 100) and severity ratings (Critical,
+# High, Medium) represent an engineering & risk governance heuristic designed
+# for this scanner to prioritize remediation efforts. They do not constitute
+# statutory penalty schedules under the Digital Personal Data Protection Act 2023.
+# ---------------------------------------------------------------------------
 
 DPDP_RULES = [
     {
@@ -7,7 +16,7 @@ DPDP_RULES = [
         "description": (
             "Section 5 of the DPDP Act requires Data Fiduciaries to provide "
             "a clear and accessible privacy notice. The absence of a privacy "
-            "policy page is a Critical violation."
+            "policy page is a fundamental compliance failure."
         ),
         "severity": "Critical",
         "check_type": "page_exists",
@@ -25,7 +34,7 @@ DPDP_RULES = [
         "label": "DPDP Act or Data Protection Law Referenced",
         "description": (
             "The privacy policy should explicitly acknowledge the DPDP Act 2023 "
-            "or the Personal Data Protection framework to demonstrate legal awareness."
+            "or the Indian Personal Data Protection statutory framework to demonstrate legal alignment."
         ),
         "severity": "High",
         "check_type": "keyword_exact",
@@ -37,15 +46,17 @@ DPDP_RULES = [
         "points": 15,
         "recommendation": (
             "Explicitly reference the Digital Personal Data Protection Act 2023 "
-            "(DPDP Act) in your Privacy Policy to demonstrate legal compliance."
+            "(DPDP Act) in your Privacy Policy to demonstrate statutory compliance."
         )
     },
     {
         "id": "DPDP-03",
-        "label": "Grievance Officer Contact Present",
+        "label": "DPO or Designated Contact Published",
         "description": (
-            "Section 13 of the DPDP Act mandates that every Data Fiduciary "
-            "must appoint a Grievance Officer and publish their contact details."
+            "Sections 8(9) and 13 of the DPDP Act require Data Fiduciaries to "
+            "publish the contact details of a Data Protection Officer (for SDFs) "
+            "or an authorized individual capable of answering data queries and handling complaints. "
+            "(Critical weight in our heuristic because rights cannot be exercised without contact details)."
         ),
         "severity": "Critical",
         "check_type": "email_pattern",
@@ -58,16 +69,17 @@ DPDP_RULES = [
         ],
         "points": 20,
         "recommendation": (
-            "Publish a dedicated Grievance Officer email address "
-            "(e.g., grievance@yourcompany.in) on your Privacy Policy page."
+            "Publish a dedicated Data Protection Officer or grievance contact email address "
+            "(e.g., dpo@yourcompany.in or grievance@yourcompany.in) on your Privacy Policy page."
         )
     },
     {
         "id": "DPDP-04",
-        "label": "Grievance Officer Role Mentioned",
+        "label": "Grievance Redressal Mechanism Documented",
         "description": (
-            "Even if no email is found, the text should mention a Grievance Officer, "
-            "Data Protection Officer, or equivalent role by name."
+            "Section 13 of the DPDP Act mandates that every Data Fiduciary provide "
+            "a readily accessible grievance redressal mechanism for Data Principals. "
+            "The policy must formally document this process and state who is responsible."
         ),
         "severity": "High",
         "check_type": "keyword_context",
@@ -78,19 +90,20 @@ DPDP_RULES = [
         ],
         "points": 10,
         "recommendation": (
-            "Clearly name and describe the role of the Grievance Officer or "
-            "Data Protection Officer in your policy documentation."
+            "Document a clear grievance redressal procedure in your Privacy Policy, "
+            "specifying complaint filing steps, resolution timelines, and escalation channels."
         )
     },
     {
         "id": "DPDP-05",
-        "label": "Cookie Consent Banner Detected",
+        "label": "Cookie Consent Banner / Notice Detected",
         "description": (
-            "The DPDP Act requires informed, specific, and free consent before "
-            "processing personal data. A consent banner on the homepage is the "
-            "standard implementation for web-based data collection."
+            "Section 6 of the DPDP Act requires informed, specific, and unambiguous consent "
+            "accompanied or preceded by a notice before personal data is processed. A consent "
+            "banner on the homepage serves as a web-based consent notice indicator. "
+            "(Assigned Medium severity in our heuristic reflecting phased enforcement timelines)."
         ),
-        "severity": "High",
+        "severity": "Medium",
         "check_type": "homepage_html",
         "target_page": "homepage",
         "keywords": [
@@ -100,17 +113,17 @@ DPDP_RULES = [
         ],
         "points": 10,
         "recommendation": (
-            "Implement a cookie consent banner that appears before any tracking "
-            "scripts are loaded. Ensure users can reject non-essential cookies."
+            "Implement a cookie consent banner that appears before tracking scripts load, "
+            "informing users of cookies and allowing them to reject non-essential categories."
         )
     },
     {
         "id": "DPDP-06",
-        "label": "Data Retention Period Mentioned",
+        "label": "Data Retention & Erasure Policy Disclosed",
         "description": (
-            "Section 8(7) of the DPDP Act states that personal data must be "
-            "erased once the purpose is served. The policy should mention a "
-            "data retention period or deletion policy."
+            "Section 8(7) of the DPDP Act mandates that personal data must be erased "
+            "once the specified purpose is fulfilled or upon consent withdrawal. The policy "
+            "should state retention criteria or scheduled periods."
         ),
         "severity": "Medium",
         "check_type": "keyword_context",
@@ -124,16 +137,16 @@ DPDP_RULES = [
         "recommendation": (
             "Add a clear data retention section to your Privacy Policy stating "
             "how long each category of personal data is retained and the criteria "
-            "used to determine retention periods."
+            "used to determine erasure schedules."
         )
     },
     {
         "id": "DPDP-07",
-        "label": "User Rights Mentioned (Access / Correction / Erasure)",
+        "label": "Data Principal Rights Documented (Access / Correction / Erasure)",
         "description": (
-            "Chapter III of the DPDP Act grants Data Principals (users) the right "
-            "to access, correct, and erase their personal data. The policy must "
-            "acknowledge these rights."
+            "Chapter III of the DPDP Act grants Data Principals statutory rights "
+            "to access summaries of personal data, correct inaccurate data, erase data, "
+            "and seek grievance redressal. The policy must clearly acknowledge these rights."
         ),
         "severity": "High",
         "check_type": "keyword_context",
@@ -145,8 +158,8 @@ DPDP_RULES = [
         ],
         "points": 5,
         "recommendation": (
-            "Add a dedicated 'Your Rights' section to your Privacy Policy that "
-            "explicitly describes the user's rights under Chapter III of the DPDP Act: "
+            "Add a dedicated 'Data Principal Rights' section to your Privacy Policy "
+            "explicitly describing rights under Chapter III of the DPDP Act: "
             "access, correction, erasure, and grievance redressal."
         )
     },
@@ -154,8 +167,8 @@ DPDP_RULES = [
         "id": "DPDP-08",
         "label": "Third-Party Data Sharing Disclosed",
         "description": (
-            "If a Data Fiduciary shares personal data with third parties, the "
-            "DPDP Act requires this to be disclosed clearly in the privacy notice."
+            "Section 6 notice obligations require disclosing personal data sharing arrangements, "
+            "categories of data processors, and purposes of disclosure."
         ),
         "severity": "Medium",
         "check_type": "keyword_context",
@@ -174,10 +187,10 @@ DPDP_RULES = [
     },
     {
         "id": "DPDP-09",
-        "label": "Contact Information for Data Queries Present",
+        "label": "Contact Channel for Data Queries Present",
         "description": (
-            "Users must have a clear way to exercise their rights. The policy "
-            "should include a contact email, form, or postal address for data-related queries."
+            "Data Principals must have a practical channel to exercise statutory rights. "
+            "The policy should include an email, web form, or postal channel for privacy inquiries."
         ),
         "severity": "Medium",
         "check_type": "email_pattern",
@@ -193,11 +206,11 @@ DPDP_RULES = [
     },
     {
         "id": "DPDP-10",
-        "label": "Children's Data Safeguards Mentioned",
+        "label": "Children's Data Processing Safeguards",
         "description": (
-            "Section 9 of the DPDP Act imposes special obligations for processing "
-            "data of children (under 18). Sites targeting general audiences should "
-            "address this."
+            "Section 9 of the DPDP Act imposes strict safeguards for processing "
+            "personal data of children (under 18), requiring verifiable parental consent "
+            "and prohibiting behavioral tracking and targeted advertising."
         ),
         "severity": "Medium",
         "check_type": "keyword_context",
@@ -209,17 +222,16 @@ DPDP_RULES = [
         "points": 2,
         "recommendation": (
             "Add a section addressing children's data under Section 9 of the DPDP Act. "
-            "Describe how you obtain verifiable parental consent before processing "
-            "personal data of users under 18."
+            "Describe how you obtain verifiable parental consent and prevent targeted advertising for minors."
         )
     },
     {
         "id": "DPDP-11",
-        "label": "Grievance Officer Contact is Not a Placeholder",
+        "label": "DPO / Contact Authenticity (Non-Placeholder Email)",
         "description": (
-            "Verifies that the Grievance Officer email address found "
-            "in the policy is not a dummy/template value and that its "
-            "domain actually exists and can receive email."
+            "Verifies that the DPO or grievance contact email address found "
+            "in the policy is not a template placeholder (e.g. 'user@domain.com') and that its "
+            "domain exists with valid MX records capable of receiving mail."
         ),
         "severity": "High",
         "check_type": "contact_authentic",
@@ -227,18 +239,16 @@ DPDP_RULES = [
         "keywords": [],
         "points": 1,
         "recommendation": (
-            "Replace placeholder or template email addresses with a real, "
-            "active Grievance Officer email on a company domain "
-            "(e.g. grievance@yourcompany.in). Ensure the domain has "
-            "valid DNS records and can receive email."
+            "Replace placeholder or template email addresses with an active DPO / "
+            "grievance email on your registered corporate domain with valid MX records."
         )
     },
     {
         "id": "DPDP-12",
-        "label": "Grievance Officer Name is Not a Placeholder",
+        "label": "Officer Identity Verification (Non-Placeholder Name)",
         "description": (
-            "Verifies that the Grievance Officer name published in "
-            "the policy is a real person's name and not a template "
+            "Verifies that the published Data Protection / Grievance Officer name "
+            "represents an actual person or designated role rather than a dummy template "
             "placeholder like 'John Doe' or 'Insert Name Here'."
         ),
         "severity": "Medium",
@@ -247,9 +257,8 @@ DPDP_RULES = [
         "keywords": [],
         "points": 1,
         "recommendation": (
-            "Replace placeholder names with the actual name of the "
-            "appointed Grievance Officer. The DPDP Act requires a "
-            "real, named individual to be responsible for grievance redressal."
+            "Ensure the published officer name represents a real, designated individual "
+            "or responsible team rather than a placeholder string."
         )
     }
 ]

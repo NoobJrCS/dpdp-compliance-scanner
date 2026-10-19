@@ -34,6 +34,11 @@ Examples:
         metavar="FILE",
         help="Skip crawling — generate PDF report from a saved JSON file"
     )
+    parser.add_argument(
+        "--client-mode",
+        action="store_true",
+        help="Run in authorized client mode (enables active SMTP socket probing on port 25). Default is prospecting mode (passive DNS, MX, and Wayback verification only)."
+    )
 
     args = parser.parse_args()
 
@@ -101,7 +106,8 @@ def main():
             passive_audit = None
 
         # STAGE 3 — Audit (also runs contact verification internally)
-        audit_results = run_audit(crawl_result, homepage_html)
+        prospecting_mode = not args.client_mode
+        audit_results = run_audit(crawl_result, homepage_html, prospecting_mode=prospecting_mode)
 
         # STAGE 4 — Retrieve the full verification result that was
         # cached inside auditor.py during the contact_authentic checks
