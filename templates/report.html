@@ -711,7 +711,190 @@
 
 
 <!-- ============================================================ -->
-<!-- PAGE 6: DISCLAIMER                                           -->
+<!-- PAGE 7: PASSIVE PRE-CONSENT AUDIT & TECHNICAL SECURITY       -->
+<!-- ============================================================ -->
+<div class="section page-break">
+    <div class="section-header">07 — Passive Pre-Consent Tracking &amp; Security</div>
+
+    <p class="muted mb-8">
+        Passive technical evaluation of the homepage on initial load prior to any user
+        clicks, consent interaction, or form submission. Evaluates third-party network requests,
+        cookie security attributes, main-document HTTP security headers, and form action targets.
+    </p>
+
+    {% if report.passive_audit %}
+        {% set pa = report.passive_audit %}
+
+        {% if pa.status == "inconclusive" %}
+        <div class="verdict-banner verdict-suspicious">
+            <div class="verdict-title">⚠ Inconclusive — Bot-Protection Challenge Detected</div>
+            <div class="verdict-detail">
+                {{ pa.error }}
+                The site intercepted automated scanning with a challenge gate.
+                Passive audit results cannot be relied upon and must be verified in a manual browser.
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 4-Stat Grid for Passive Audit -->
+        <table class="summary-grid mb-16">
+            <tr>
+                <td>
+                    <span class="stat-number {% if pa.tracker_requests %}stat-fail{% else %}stat-pass{% endif %}">
+                        {{ pa.tracker_requests | length }}
+                    </span>
+                    <span class="stat-label">Trackers Before Consent</span>
+                </td>
+                <td>
+                    <span class="stat-number {% if pa.tracker_cookies %}stat-fail{% else %}stat-pass{% endif %}">
+                        {{ pa.tracker_cookies | length }}
+                    </span>
+                    <span class="stat-label">Tracker Cookies Set</span>
+                </td>
+                <td>
+                    <span class="stat-number {% if pa.cookie_issues %}stat-fail{% else %}stat-pass{% endif %}">
+                        {{ pa.cookie_issues | length }}
+                    </span>
+                    <span class="stat-label">Cookie Flag Issues</span>
+                </td>
+                <td>
+                    <span class="stat-number {% if pa.missing_headers %}stat-fail{% else %}stat-pass{% endif %}">
+                        {{ pa.missing_headers | length }}
+                    </span>
+                    <span class="stat-label">Missing Security Headers</span>
+                </td>
+            </tr>
+        </table>
+
+        <!-- 1. Trackers Section -->
+        <div class="verify-subheader">Third-Party Trackers (Fired Prior to Consent)</div>
+        {% if pa.tracker_requests %}
+        <table class="checks-table mb-16">
+            <thead>
+                <tr>
+                    <th style="width: 32%;">Tracker Service</th>
+                    <th style="width: 20%;">Category</th>
+                    <th style="width: 14%;">Requests</th>
+                    <th style="width: 34%;">Target Domain / Resource</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in pa.tracker_requests %}
+                <tr>
+                    <td><strong>{{ t.name }}</strong></td>
+                    <td>
+                        <span class="operator-badge">{{ t.category }}</span>
+                    </td>
+                    <td style="text-align: center; font-weight: 600;">{{ t.request_count }}x</td>
+                    <td style="font-size: 7.5pt; color: #4b5563; word-break: break-all;">
+                        {{ t.example_url[:80] }}{% if t.example_url | length > 80 %}...{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="no-contacts-box mb-16" style="border-style: solid; border-color: #bbf7d0; background: #f0fdf4; color: #166534;">
+            ✓ No known third-party tracking scripts fired before user interaction.
+        </div>
+        {% endif %}
+
+        <!-- 2. Cookie Flag Security Issues -->
+        {% if pa.cookie_issues %}
+        <div class="verify-subheader">Cookie Flag Issues (Secure / SameSite / HttpOnly)</div>
+        <table class="checks-table mb-16">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Cookie Name</th>
+                    <th style="width: 25%;">Domain</th>
+                    <th style="width: 45%;">Detected Configuration Issues</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in pa.cookie_issues[:15] %}
+                <tr>
+                    <td style="font-family: monospace; font-size: 8pt;"><strong>{{ c.name }}</strong></td>
+                    <td style="font-size: 8pt; color: #6b7280;">{{ c.domain }}</td>
+                    <td>
+                        {% for issue in c.issues %}
+                        <span style="display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; font-size: 7.5pt; padding: 1px 5px; border-radius: 3px; margin: 1px;">
+                            {{ issue }}
+                        </span>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if pa.cookie_issues | length > 15 %}
+        <p class="muted mb-16" style="font-size: 8pt;">
+            * Truncated: {{ pa.cookie_issues | length - 15 }} additional cookie issue(s) omitted for report length.
+        </p>
+        {% endif %}
+        {% endif %}
+
+        <!-- 3. Security Headers Checklist -->
+        <div class="verify-subheader">HTTP Response Security Headers (Indicators)</div>
+        <table class="checks-table mb-16">
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Header Name</th>
+                    <th style="width: 15%;">Status</th>
+                    <th style="width: 50%;">Security Role &amp; Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if pa.missing_headers %}
+                    {% for h in pa.missing_headers %}
+                    <tr>
+                        <td><strong>{{ h.header }}</strong></td>
+                        <td style="text-align: center;"><span class="icon-fail">Missing</span></td>
+                        <td style="font-size: 8pt; color: #4b5563;">{{ h.why }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: #166534; background: #f0fdf4;">
+                            ✓ Key security headers (HSTS, CSP, X-Content-Type-Options, Referrer-Policy, Clickjacking protection) detected.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <!-- 4. Form Issues (if any) -->
+        {% if pa.form_issues %}
+        <div class="verify-subheader">Form Submission Security Concerns</div>
+        <div class="mb-16">
+            {% for f in pa.form_issues %}
+            <div style="padding: 5px 10px; margin-bottom: 4px; background: #fef2f2; border-left: 3px solid #ef4444; font-size: 8.5pt; color: #7f1d1d;">
+                ✗ [{{ f.type }}] {{ f.detail }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Limitations Callout -->
+        <div style="background: #f8fafc; border-left: 3px solid #64748b; padding: 8px 12px; font-size: 8pt; color: #475569; margin-top: 10px;">
+            <strong>Technical Context &amp; Readiness Limitations:</strong>
+            <ul style="margin-left: 16px; margin-top: 4px;">
+                {% for lim in pa.limitations %}
+                <li>{{ lim }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+    {% else %}
+    <div class="no-contacts-box">
+        Passive pre-consent audit data was not collected or was skipped for this scan.
+    </div>
+    {% endif %}
+
+</div>
+
+
+<!-- ============================================================ -->
+<!-- PAGE 8: DISCLAIMER                                           -->
 <!-- ============================================================ -->
 <div class="disclaimer">
     <h4>Legal Disclaimer &amp; Limitations</h4>

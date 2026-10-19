@@ -11,6 +11,11 @@
 #   GET  /history               List of recent scans
 # ---------------------------------------------------------------
 
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import os
 import uuid
 import json
@@ -29,6 +34,7 @@ from crawler  import run_crawler, fetch_page, normalize_url
 from auditor  import run_audit, get_verification_result
 from scorer   import generate_score_report
 from reporter import generate_pdf_report
+from tracker_audit import audit_page
 
 app = Flask(__name__)
 
@@ -102,27 +108,103 @@ def run_scan(job_id: str, domain: str):
 
         crawl_result = run_crawler(domain)
 
+        if crawl_result.get("blocked"):
+            reason = crawl_result.get("blocked_reason", "Site is protected by bot detection or disallowed by robots.txt.")
+            push(job_id, "progress", {
+                "stage":   "crawl",
+                "message": f"⚠️ Scan inconclusive: {reason}",
+                "percent": 100
+            })
+            push(job_id, "inconclusive", {
+                "domain": domain,
+                "message": f"Scan inconclusive for {domain}",
+                "reason": reason,
+                "detail": (
+                    "The automated scanner was stopped because robots.txt disallows crawling, "
+                    "or the site was intercepted by a bot-detection challenge (e.g. Akamai, Cloudflare, or WAF). "
+                    "Automated audit results cannot be guaranteed without human browser verification."
+                )
+            })
+            with jobs_lock:
+                jobs[job_id]["status"] = "inconclusive"
+                jobs[job_id]["error"]  = reason
+            return
+
         pages_found = len(crawl_result.get("pages_found", {}))
+        if pages_found == 0:
+            msg = crawl_result.get("blocked_reason") or "No compliance pages (Privacy Policy, Terms) could be retrieved."
+            push(job_id, "progress", {
+                "stage":   "crawl",
+                "message": f"⚠️ Scan inconclusive: {msg}",
+                "percent": 100
+            })
+            push(job_id, "inconclusive", {
+                "domain": domain,
+                "message": f"Scan inconclusive for {domain}",
+                "reason": msg,
+                "detail": (
+                    "No privacy policy or legal pages could be extracted. "
+                    "Automated audit cannot evaluate compliance on 0 pages. "
+                    "Verify the target URL or check if the site is blocking automated access."
+                )
+            })
+            with jobs_lock:
+                jobs[job_id]["status"] = "inconclusive"
+                jobs[job_id]["error"]  = msg
+            return
+
         push(job_id, "progress", {
             "stage":   "crawl",
             "message": f"✓ Crawl complete — {pages_found} compliance page(s) found",
             "percent": 25
         })
 
-        # ── STAGE 2: Homepage HTML for DPDP-05 ──────────────────
+        # ── STAGE 2: Passive Pre-Consent Tracker & Security Audit ──
+        push(job_id, "progress", {
+            "stage":   "tracker",
+            "message": "🕵️ Scanning pre-consent trackers and security headers...",
+            "percent": 30
+        })
+
+        passive_audit = None
+        try:
+            passive_audit = audit_page(domain, settle_ms=2500)
+            if passive_audit.get("status") == "inconclusive":
+                push(job_id, "progress", {
+                    "stage":   "tracker",
+                    "message": "⚠️ Passive audit inconclusive (bot challenge detected)",
+                    "percent": 38
+                })
+            else:
+                tr_cnt = len(passive_audit.get("tracker_requests", []))
+                ck_cnt = len(passive_audit.get("cookie_issues", []))
+                hd_cnt = len(passive_audit.get("missing_headers", []))
+                push(job_id, "progress", {
+                    "stage":   "tracker",
+                    "message": f"✓ Found {tr_cnt} tracker(s), {ck_cnt} cookie issue(s), {hd_cnt} missing header(s)",
+                    "percent": 38
+                })
+        except Exception as e:
+            push(job_id, "progress", {
+                "stage":   "tracker",
+                "message": f"⚠️ Passive audit skipped: {e}",
+                "percent": 38
+            })
+
+        # ── STAGE 3: Homepage HTML for DPDP-05 ──────────────────
         push(job_id, "progress", {
             "stage":   "crawl",
             "message": "🍪 Checking cookie consent banner...",
-            "percent": 30
+            "percent": 42
         })
 
         homepage_html = fetch_page(normalize_url(domain)) or ""
 
-        # ── STAGE 3: Audit ──────────────────────────────────────
+        # ── STAGE 4: Audit ──────────────────────────────────────
         push(job_id, "progress", {
             "stage":   "audit",
             "message": "🔍 Running 12 DPDP compliance checks...",
-            "percent": 40
+            "percent": 50
         })
 
         audit_results = run_audit(crawl_result, homepage_html)
@@ -136,7 +218,7 @@ def run_scan(job_id: str, domain: str):
             "percent": 60
         })
 
-        # ── STAGE 4: Contact Verification ───────────────────────
+        # ── STAGE 5: Contact Verification ───────────────────────
         push(job_id, "progress", {
             "stage":   "verify",
             "message": "🔎 Verifying contact authenticity (DNS, SMTP, Wayback Machine)...",
@@ -160,7 +242,7 @@ def run_scan(job_id: str, domain: str):
                 "percent": 75
             })
 
-        # ── STAGE 5: Score ──────────────────────────────────────
+        # ── STAGE 6: Score ──────────────────────────────────────
         push(job_id, "progress", {
             "stage":   "score",
             "message": "📊 Calculating risk score and grade...",
@@ -172,7 +254,8 @@ def run_scan(job_id: str, domain: str):
             crawl_result,
             audit_results,
             scan_duration,
-            verification_result
+            verification_result,
+            passive_audit_result=passive_audit
         )
 
         push(job_id, "progress", {
@@ -237,7 +320,8 @@ def run_scan(job_id: str, domain: str):
             "checks":     {
                 k: {"label": v["label"], "passed": v["passed"], "severity": v["severity"]}
                 for k, v in report["checks"].items()
-            }
+            },
+            "passive_audit": passive_audit
         })
 
     except Exception as e:
@@ -249,7 +333,7 @@ def run_scan(job_id: str, domain: str):
             jobs[job_id]["status"] = "error"
             jobs[job_id]["error"]  = error_msg
 
-        push(job_id, "error", {
+        push(job_id, "scan_error", {
             "message": f"Scan failed: {error_msg}",
             "detail":  tb
         })
@@ -338,8 +422,8 @@ def progress_stream(job_id: str):
                 msg = job_queue.get(timeout=1)
                 yield f"event: {msg['event']}\ndata: {msg['data']}\n\n"
 
-                # Stop streaming once the scan is done or errored
-                if msg["event"] in ("result", "error"):
+                # Stop streaming once the scan is done, inconclusive, or errored
+                if msg["event"] in ("result", "inconclusive", "scan_error"):
                     break
 
             except queue.Empty:
@@ -349,7 +433,7 @@ def progress_stream(job_id: str):
                 # Check if job finished without sending result event
                 with jobs_lock:
                     status = jobs.get(job_id, {}).get("status")
-                if status in ("done", "error"):
+                if status in ("done", "error", "inconclusive"):
                     break
 
     return Response(

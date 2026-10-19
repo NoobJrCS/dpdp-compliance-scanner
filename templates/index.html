@@ -81,6 +81,11 @@
                 <span class="stage-label">Crawl</span>
             </div>
             <div class="stage-arrow">→</div>
+            <div class="stage" id="stage-tracker">
+                <span class="stage-icon">🕵️</span>
+                <span class="stage-label">Trackers</span>
+            </div>
+            <div class="stage-arrow">→</div>
             <div class="stage" id="stage-audit">
                 <span class="stage-icon">🔍</span>
                 <span class="stage-label">Audit</span>
@@ -173,6 +178,71 @@
         </h3>
         <div id="deductionsList"></div>
 
+        <!-- Passive Pre-Consent Audit Section -->
+        <div class="passive-audit-card hidden" id="passiveAuditCard">
+            <div class="passive-header">
+                <div>
+                    <h3 class="section-label" style="margin-bottom: 2px;">Pre-Consent Tracking &amp; Security</h3>
+                    <div class="passive-sub">Technical inspection on first page load before user interaction</div>
+                </div>
+                <span class="passive-badge" id="passiveStatusBadge">Readiness</span>
+            </div>
+
+            <!-- Inconclusive alert if bot challenge occurred -->
+            <div class="passive-alert hidden" id="passiveInconclusiveAlert">
+                <span class="passive-alert-icon">⚠️</span>
+                <div class="passive-alert-text" id="passiveInconclusiveText"></div>
+            </div>
+
+            <!-- 4-Stat Row -->
+            <div class="passive-stats-row">
+                <div class="passive-stat-box">
+                    <div class="passive-stat-num" id="statTrackersCount">0</div>
+                    <div class="passive-stat-lbl">Pre-Consent Trackers</div>
+                </div>
+                <div class="passive-stat-box">
+                    <div class="passive-stat-num" id="statTrackerCookiesCount">0</div>
+                    <div class="passive-stat-lbl">Tracker Cookies</div>
+                </div>
+                <div class="passive-stat-box">
+                    <div class="passive-stat-num" id="statCookieIssuesCount">0</div>
+                    <div class="passive-stat-lbl">Cookie Flag Issues</div>
+                </div>
+                <div class="passive-stat-box">
+                    <div class="passive-stat-num" id="statMissingHeadersCount">0</div>
+                    <div class="passive-stat-lbl">Missing Headers</div>
+                </div>
+            </div>
+
+            <!-- Trackers Sub-panel -->
+            <div class="passive-subsection" id="passiveTrackersSection">
+                <div class="passive-subtitle">Trackers Firing Before Interaction</div>
+                <div id="passiveTrackersList"></div>
+            </div>
+
+            <!-- Cookie Issues Sub-panel -->
+            <div class="passive-subsection" id="passiveCookiesSection">
+                <div class="passive-subtitle">Cookie Flag Issues</div>
+                <div id="passiveCookiesList"></div>
+            </div>
+
+            <!-- Security Headers Sub-panel -->
+            <div class="passive-subsection" id="passiveHeadersSection">
+                <div class="passive-subtitle">Security Headers Status</div>
+                <div id="passiveHeadersList"></div>
+            </div>
+
+            <!-- Form Issues Sub-panel (optional) -->
+            <div class="passive-subsection hidden" id="passiveFormsSection">
+                <div class="passive-subtitle">Form Security Concerns</div>
+                <div id="passiveFormsList"></div>
+            </div>
+
+            <div class="passive-limitations">
+                * Note: Network tracker requests reflect first-load Indian visitor traffic. These serve as technical readiness indicators under DPDP Section 6.
+            </div>
+        </div>
+
         <!-- Actions -->
         <div class="actions-row">
             <button class="btn-download" id="downloadBtn" onclick="downloadPDF()">
@@ -181,6 +251,18 @@
             <button class="btn-new" onclick="newScan()">
                 ↺ New Scan
             </button>
+        </div>
+    </section>
+
+    <!-- ── INCONCLUSIVE PANEL ─────────────────────────────────── -->
+    <section class="card inconclusive-card hidden" id="inconclusiveCard">
+        <div class="inconclusive-icon">⚠️</div>
+        <h3 class="inconclusive-title">Scan Inconclusive</h3>
+        <div class="inconclusive-target" id="inconclusiveDomain"></div>
+        <div class="inconclusive-reason-box" id="inconclusiveReason"></div>
+        <div class="inconclusive-detail" id="inconclusiveDetail"></div>
+        <div class="inconclusive-actions">
+            <button class="btn-new" onclick="newScan()">Try Another Site</button>
         </div>
     </section>
 

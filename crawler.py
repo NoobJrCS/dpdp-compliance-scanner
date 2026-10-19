@@ -1,15 +1,85 @@
 # crawler.py
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import time
 import urllib.parse
+import urllib.request
+import urllib.error
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from bs4 import BeautifulSoup
 from robots_check import is_scraping_allowed, get_crawl_delay
 
 # Keywords that suggest a page is relevant to DPDP compliance
+# Avoid loose words like "policy" or "data" which falsely match insurance products or mobile data
 COMPLIANCE_KEYWORDS = [
-    "privacy", "policy", "terms", "data", "legal",
-    "grievance", "cookie", "consent", "personal data", "protection"
+    "privacy", "terms", "grievance", "cookie", "legal",
+    "user agreement", "disclaimer", "data protection"
 ]
+
+BLOCKED_TITLES = (
+    "access denied", "just a moment", "attention required",
+    "pardon our interruption", "checking your browser",
+    "are you a robot", "request blocked", "challenge validation",
+    "security challenge", "human verification", "verify you are human",
+    "security check", "bot verification"
+)
+
+BOT_COOKIE_PREFIXES = (
+    "ak_bmsc", "sec_cpt", "bm_sz", "_abck",
+    "__cf_bm", "cf_clearance", "cf_chl",
+    "datadome", "incap_ses", "visid_incap",
+    "_px3", "_pxhd", "kpsdk", "aws-waf-token"
+)
+
+
+def check_bot_block(page, html: str) -> tuple[bool, str]:
+    """
+    Checks if a Playwright page was served a bot challenge or block page.
+    Returns (True, reason) or (False, '').
+    """
+    try:
+        title = (page.title() or "").strip()
+        title_l = title.lower()
+    except Exception:
+        title = ""
+        title_l = ""
+
+    for bt in BLOCKED_TITLES:
+        if bt in title_l:
+            return True, f"block-page title '{title}'"
+
+    try:
+        cookies = page.context.cookies()
+    except Exception:
+        cookies = []
+
+    detected_bot_cookies = [
+        c["name"] for c in cookies
+        if any(c["name"].lower().startswith(p) for p in BOT_COOKIE_PREFIXES)
+    ]
+    explicit_challenge = [
+        c for c in detected_bot_cookies
+        if c.lower().startswith(("sec_cpt", "cf_chl"))
+    ]
+    if explicit_challenge:
+        return True, f"active challenge token ({', '.join(explicit_challenge)})"
+
+    if detected_bot_cookies and any(w in title_l for w in ("challenge", "validation", "captcha", "verify", "robot")):
+        return True, f"bot challenge ('{title}')"
+
+    soup = BeautifulSoup(html, "lxml")
+    for tag in soup(["script", "style", "nav", "header", "footer"]):
+        tag.decompose()
+    clean = soup.get_text(strip=True).lower()
+    if len(clean) < 150:
+        for bt in ("challenge validation", "access denied", "attention required", "security check", "are you a robot"):
+            if bt in clean:
+                return True, f"bot block text ('{bt}')"
+
+    return False, ""
 
 
 def normalize_url(domain: str) -> str:
@@ -34,27 +104,50 @@ def normalize_url(domain: str) -> str:
     return f"https://{domain}"
 
 
+def fetch_page_http(url: str, timeout: int = 12) -> str | None:
+    """
+    Direct HTTP fallback using standard Python urllib.
+    Used when Playwright Chromium encounters net::ERR_HTTP2_PROTOCOL_ERROR
+    or stream resets on WAF/CDN protected sites.
+    """
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status == 200:
+                html = resp.read().decode("utf-8", errors="replace")
+                soup = BeautifulSoup(html, "lxml")
+                title = soup.title.string.strip() if soup.title and soup.title.string else ""
+                title_l = title.lower()
+                for bt in BLOCKED_TITLES:
+                    if bt in title_l:
+                        print(f"  [BLOCKED] Bot challenge detected in HTTP fallback ('{title}'): {url}")
+                        return None
+                return html
+    except Exception as e:
+        print(f"  [ERROR] Direct HTTP fetch failed for {url}: {e}")
+        return None
+    return None
+
+
 def fetch_page(url: str, timeout_ms: int = 15000, retries: int = 2) -> str | None:
     """
     Uses Playwright (headless Chromium) to fetch a fully JS-rendered page.
-    Returns the full HTML string, or None if all attempts fail.
-
-    EDGE CASE 1: Logs redirects so you can see when http → https or
-                 www → non-www redirects happen.
-
-    EDGE CASE 3: Retry logic with exponential backoff.
-                 Waits 2s after first failure, 4s after second failure.
-                 This handles 403 Forbidden and 429 Too Many Requests.
-
-    timeout_ms : How long to wait for the page to load (default: 15 seconds)
-    retries    : Number of additional attempts after first failure (default: 2)
+    Falls back to direct HTTP (urllib) if Playwright encounters protocol errors
+    (e.g. net::ERR_HTTP2_PROTOCOL_ERROR on WAFs).
     """
     for attempt in range(retries + 1):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
 
-            # Create a browser context with a real-looking user agent
-            # This reduces the chance of being blocked as a bot
             context = browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -71,28 +164,45 @@ def fetch_page(url: str, timeout_ms: int = 15000, retries: int = 2) -> str | Non
                 # Brief pause to allow lazy-loaded footer content to appear
                 time.sleep(2)
 
-                # EDGE CASE 1: Capture final URL after all redirects
+                # Capture final URL after all redirects
                 final_url = page.url
                 if final_url != url:
                     print(f"  [REDIRECT] {url}")
-                    print(f"           → {final_url}")
+                    print(f"           -> {final_url}")
 
                 html = page.content()
+                is_blocked, block_reason = check_bot_block(page, html)
+                if is_blocked:
+                    print(f"  [BLOCKED] Bot protection challenge detected ({block_reason}): {final_url}")
+                    return None
+
                 return html
 
             except PlaywrightTimeout:
-                # EDGE CASE 3: Exponential backoff — wait longer each retry
-                wait = 2 ** attempt  # attempt 0 → 1s, attempt 1 → 2s, attempt 2 → 4s
+                wait = 2 ** attempt
                 if attempt < retries:
                     print(f"  [TIMEOUT] Attempt {attempt + 1}/{retries + 1} failed. "
                           f"Retrying in {wait}s...")
                     time.sleep(wait)
                 else:
-                    print(f"  [TIMEOUT] All {retries + 1} attempts failed: {url}")
+                    print(f"  [TIMEOUT] Playwright attempts failed: {url}")
+                    print(f"  [FALLBACK] Attempting direct HTTP fallback for: {url}")
+                    http_html = fetch_page_http(url)
+                    if http_html:
+                        print(f"  [OK] Successfully retrieved page via HTTP fallback: {url}")
+                        return http_html
                     return None
 
             except Exception as e:
-                print(f"  [ERROR] Could not fetch {url}: {e}")
+                err_str = str(e)
+                print(f"  [ERROR] Playwright could not fetch {url}: {err_str}")
+                # If network or HTTP2 protocol error or connection reset, try HTTP fallback
+                if "ERR_HTTP2" in err_str or "ERR_CONNECTION" in err_str or "ERR_SSL" in err_str:
+                    print(f"  [FALLBACK] Attempting direct HTTP fallback for: {url}")
+                    http_html = fetch_page_http(url)
+                    if http_html:
+                        print(f"  [OK] Successfully retrieved page via HTTP fallback: {url}")
+                        return http_html
                 return None
 
             finally:
@@ -121,20 +231,24 @@ def extract_compliance_links(html: str, base_url: str) -> dict:
         link_text = link.get_text(strip=True).lower()
         href = link["href"].strip()
 
-        # Skip empty, javascript:void, and anchor links
-        if not href or href.startswith("#") or href.startswith("javascript:"):
+        # Skip empty, javascript, anchors, and non-web protocols
+        if not href or href.startswith(("#", "javascript:", "tel:", "mailto:", "sms:")):
             continue
 
-        # Check if the link text contains any of our compliance keywords
+        # Skip long promotional/product cards (real compliance links are concise)
+        if len(link_text) > 80:
+            continue
+
+        # Check if the link text contains any compliance keywords
         for keyword in COMPLIANCE_KEYWORDS:
             if keyword in link_text:
-                # Build the full URL if it's a relative path (e.g., "/privacy")
-                if href.startswith("http"):
-                    full_url = href
-                else:
-                    full_url = base_url.rstrip("/") + "/" + href.lstrip("/")
+                full_url = urllib.parse.urljoin(base_url, href)
+                if not full_url.startswith(("http://", "https://")):
+                    continue
 
                 label = link.get_text(strip=True)
+                # Keep labels clean and reasonable in length
+                label = " ".join(label.split())[:60]
                 found_links[label] = full_url
                 break
 
@@ -216,11 +330,13 @@ def run_crawler(domain: str) -> dict:
     homepage_allowed = is_scraping_allowed(base_url, "/")
 
     if not homepage_allowed:
-        print(f"  ✗ robots.txt disallows crawling this domain. Skipping.")
+        print(f"  [FAIL] robots.txt disallows crawling this domain. Skipping.")
         result["errors"].append("robots.txt disallows crawling this domain.")
+        result["blocked"] = True
+        result["blocked_reason"] = "robots.txt explicitly disallows automated crawlers for this domain (User-agent: *)."
         return result
     else:
-        print(f"  ✓ robots.txt permits crawling.")
+        print(f"  [OK] robots.txt permits crawling.")
 
     # Get the crawl delay specified in robots.txt (defaults to 1.0s)
     crawl_delay = get_crawl_delay(base_url)
@@ -233,10 +349,13 @@ def run_crawler(domain: str) -> dict:
     homepage_html = fetch_page(base_url)
 
     if not homepage_html:
-        result["errors"].append("Could not fetch homepage.")
+        result["errors"].append("Could not fetch homepage (blocked by bot protection or unreachable).")
+        result["blocked"] = True
+        result["blocked_reason"] = "Site appears to be protected by a bot-detection challenge (e.g. Akamai, Cloudflare, or WAF)."
+        print("  [!] Crawl stopped: Homepage could not be retrieved.\n")
         return result
 
-    print(f"  ✓ Homepage loaded successfully.\n")
+    print(f"  [OK] Homepage loaded successfully.\n")
 
     # -----------------------------------------------------------------------
     # STEP 2: Find compliance links
@@ -246,12 +365,14 @@ def run_crawler(domain: str) -> dict:
 
     if not links:
         result["errors"].append("No compliance links found on homepage.")
-        print(f"  ✗ No compliance links found.\n")
+        result["blocked"] = True
+        result["blocked_reason"] = "No compliance links (Privacy Policy, Terms) could be found on the homepage."
+        print(f"  [NOTE] No compliance links found.\n")
         return result
 
-    print(f"  ✓ Found {len(links)} relevant link(s):")
+    print(f"  [OK] Found {len(links)} relevant link(s):")
     for label, url in links.items():
-        print(f"     → [{label}]: {url}")
+        print(f"     -> [{label}]: {url}")
     print()
 
     # -----------------------------------------------------------------------
@@ -279,15 +400,24 @@ def run_crawler(domain: str) -> dict:
                 print(f"         This is common for OneTrust/Termly-hosted policies.")
 
             clean_text = extract_clean_text(page_html)
+            if len(clean_text) < 150:
+                print(f"  [WARNING] Content for '{label}' is too short ({len(clean_text)} chars) — skipping.")
+                result["errors"].append(f"Content for {label} was too short or empty ({len(clean_text)} chars).")
+                continue
+
             result["pages_found"][label] = {
                 "url": url,
                 "text": clean_text,
                 "char_count": len(clean_text)
             }
-            print(f"  ✓ Extracted {len(clean_text):,} characters from '{label}'")
+            print(f"  [OK] Extracted {len(clean_text):,} characters from '{label}'")
         else:
             result["errors"].append(f"Failed to fetch: {label} ({url})")
-            print(f"  ✗ Failed to fetch '{label}'")
+            print(f"  [FAIL] Failed to fetch '{label}'")
+
+    if not result["pages_found"]:
+        result["blocked"] = True
+        result["blocked_reason"] = "No compliance pages could be accessed (blocked by bot protection or missing content)."
 
     print(f"\n{'=' * 60}")
     print(f"  CRAWL COMPLETE")

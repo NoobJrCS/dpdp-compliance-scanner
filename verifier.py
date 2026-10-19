@@ -262,6 +262,8 @@ def check_mx_record(email: str) -> dict:
         }
 
 
+_PORT_25_BLOCKED = False
+
 def check_smtp_reachable(email: str) -> dict:
     """
     Check 4: SMTP Reachability Check.
@@ -271,20 +273,24 @@ def check_smtp_reachable(email: str) -> dict:
 
     Steps:
       1. Looks up MX record to find the mail server
-      2. Opens SMTP connection on port 25
+      2. Opens SMTP connection on port 25 (with fast 3s timeout)
       3. Sends HELO + MAIL FROM + RCPT TO
       4. Reads server response code
       5. Closes immediately — no email is sent
 
     Response codes:
-      250 = Address accepted  → PASS
-      550 = Address rejected  → FAIL (mailbox doesn't exist)
-      Other / timeout         → INCONCLUSIVE (not a failure)
-
-    Most large servers block SMTP probing — inconclusive is
-    the expected result for Gmail, Microsoft, etc. We never
-    penalise for an inconclusive result.
+      250 = Address accepted  -> PASS
+      550 = Address rejected  -> FAIL (mailbox doesn't exist)
+      Other / timeout         -> INCONCLUSIVE (not a failure)
     """
+    global _PORT_25_BLOCKED
+    if _PORT_25_BLOCKED:
+        return {
+            "passed":     True,
+            "conclusive": False,
+            "reason":     "SMTP check skipped — outbound port 25 is blocked on this network/ISP."
+        }
+
     try:
         domain = email.split("@")[1].lower()
     except IndexError:
@@ -300,9 +306,26 @@ def check_smtp_reachable(email: str) -> dict:
     except Exception:
         pass
 
+    # Fast probe on a single resolved IPv4 address with 1.5s timeout.
+    # Prevents smtplib from hanging across multiple IPv6/IPv4 addresses for 38+ seconds
+    # when residential ISPs or firewalls block port 25.
     try:
-        smtp = smtplib.SMTP(timeout=8)
-        smtp.connect(mail_server, 25)
+        server_ip = socket.gethostbyname(mail_server)
+        probe_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        probe_sock.settimeout(1.5)
+        probe_sock.connect((server_ip, 25))
+        probe_sock.close()
+    except Exception as e:
+        _PORT_25_BLOCKED = True
+        return {
+            "passed":     True,
+            "conclusive": False,
+            "reason":     f"SMTP check inconclusive — port 25 blocked or unreachable: {e}"
+        }
+
+    try:
+        smtp = smtplib.SMTP(timeout=2)
+        smtp.connect(server_ip, 25)
         smtp.helo("dpdpscanner.verify")
         smtp.mail("verify@dpdpscanner.in")
         code, message = smtp.rcpt(email)
@@ -327,18 +350,11 @@ def check_smtp_reachable(email: str) -> dict:
                 "reason":     f"SMTP response inconclusive (code {code})."
             }
 
-    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected,
-            ConnectionRefusedError, OSError) as e:
-        return {
-            "passed":     True,
-            "conclusive": False,
-            "reason":     f"SMTP check inconclusive — server likely blocks probing: {e}"
-        }
     except Exception as e:
         return {
             "passed":     True,
             "conclusive": False,
-            "reason":     f"SMTP check failed unexpectedly: {e}"
+            "reason":     f"SMTP probing inconclusive: {e}"
         }
 
 
@@ -504,7 +520,7 @@ def check_wayback_history(base_url: str, current_emails: list) -> dict:
             f"&fl=timestamp,original"
         )
 
-        response = requests.get(cdx_url, timeout=8)
+        response = requests.get(cdx_url, timeout=4)
         response.raise_for_status()
         data = response.json()
 
@@ -526,7 +542,7 @@ def check_wayback_history(base_url: str, current_emails: list) -> dict:
         result["snapshot_url"]   = snapshot_url
         result["snapshot_date"]  = snapshot_date
 
-        snap_response = requests.get(snapshot_url, timeout=10)
+        snap_response = requests.get(snapshot_url, timeout=4)
         snap_text     = snap_response.text
 
         historical_emails = re.findall(
@@ -659,7 +675,7 @@ def verify_contacts(text: str, base_url: str) -> dict:
         if carrier.get("warning"):
             results["warnings"].append(f"Phone '{phone}': {carrier['reason']}")
         if carrier.get("operator"):
-            print(f"  [PHONE] {phone} → Operator: {carrier['operator']}")
+            print(f"  [PHONE] {phone} -> Operator: {carrier['operator']}")
 
     # ── Name Checks ──────────────────────────────────────────────
     for name in names[:3]:
@@ -695,10 +711,10 @@ def verify_contacts(text: str, base_url: str) -> dict:
 
     # ── Terminal Summary ──────────────────────────────────────────
     verdict_display = {
-        "authentic":         "✅ AUTHENTIC   — Contact details appear genuine",
-        "suspicious":        "⚠️  SUSPICIOUS  — Contact details have concerns",
-        "fake_detected":     "❌ FAKE/DUMMY  — Placeholder contact details detected",
-        "no_contacts_found": "❓ NOT FOUND   — No contact details could be extracted"
+        "authentic":         "[OK] AUTHENTIC   - Contact details appear genuine",
+        "suspicious":        "[WARN] SUSPICIOUS - Contact details have concerns",
+        "fake_detected":     "[FAIL] FAKE/DUMMY - Placeholder contact details detected",
+        "no_contacts_found": "[INFO] NOT FOUND  - No contact details could be extracted"
     }
 
     print(f"\n  Contact Verification Result:")
@@ -707,12 +723,12 @@ def verify_contacts(text: str, base_url: str) -> dict:
     if results["failures"]:
         print(f"\n  Issues found:")
         for f in results["failures"]:
-            print(f"    ✗ {f}")
+            print(f"    [FAIL] {f}")
 
     if results["warnings"]:
         print(f"\n  Warnings:")
         for w in results["warnings"]:
-            print(f"    ⚠ {w}")
+            print(f"    [WARN] {w}")
 
     print()
     return results

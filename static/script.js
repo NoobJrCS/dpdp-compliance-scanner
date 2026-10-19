@@ -49,6 +49,7 @@ async function startScan() {
     resetProgressPanel();
     hide("resultsCard");
     hide("errorCard");
+    hide("inconclusiveCard");
 
     // Disable the scan button
     el("scanBtn").disabled = true;
@@ -88,37 +89,59 @@ async function startScan() {
 
 // ── SSE: Connect to progress stream ─────────────────────────────
 
+let streamFinished = false;
+
 function connectProgressStream(jobId) {
+    streamFinished = false;
     eventSource = new EventSource(`/progress/${jobId}`);
 
     // Progress updates
     eventSource.addEventListener("progress", (e) => {
-        const data = JSON.parse(e.data);
-        updateProgress(data);
+        try {
+            const data = JSON.parse(e.data);
+            updateProgress(data);
+        } catch (_) {}
     });
 
     // Final result
     eventSource.addEventListener("result", (e) => {
-        const data = JSON.parse(e.data);
+        streamFinished = true;
         closeEventSource();
-        showResults(data);
+        try {
+            const data = JSON.parse(e.data);
+            showResults(data);
+        } catch (err) {
+            showError("Failed to parse scan results: " + err.message);
+        }
     });
 
-    // Error from server
-    eventSource.addEventListener("error", (e) => {
+    // Inconclusive scan (robots.txt disallow, bot challenge gate)
+    eventSource.addEventListener("inconclusive", (e) => {
+        streamFinished = true;
+        closeEventSource();
+        try {
+            const data = JSON.parse(e.data);
+            showInconclusive(data);
+        } catch (_) {
+            showInconclusive({});
+        }
+    });
+
+    // Server-side scan error
+    eventSource.addEventListener("scan_error", (e) => {
+        streamFinished = true;
+        closeEventSource();
         let msg = "An unexpected error occurred.";
         try {
             const data = JSON.parse(e.data);
             msg = data.message || msg;
         } catch (_) {}
-        closeEventSource();
         showError(msg);
     });
 
     // SSE connection error (network issue)
     eventSource.onerror = () => {
-        // Only treat as error if we haven't finished yet
-        if (currentJobId) {
+        if (!streamFinished && currentJobId) {
             closeEventSource();
             showError("Lost connection to the server. Please try again.");
         }
@@ -156,7 +179,7 @@ function updateProgress(data) {
     logBox.scrollTop = logBox.scrollHeight;
 
     // Update stage indicators
-    const stageOrder = ["crawl", "audit", "verify", "score", "report"];
+    const stageOrder = ["crawl", "tracker", "audit", "verify", "score", "report"];
     const stageIndex  = stageOrder.indexOf(stage);
 
     stageOrder.forEach((s, i) => {
@@ -265,8 +288,176 @@ function showResults(data) {
         });
     }
 
+    // Passive pre-consent audit findings
+    if (data.passive_audit) {
+        const pa = data.passive_audit;
+        const summ = pa.summary || {};
+
+        // Inconclusive state (bot protection)
+        if (pa.status === "inconclusive") {
+            show("passiveInconclusiveAlert");
+            text("passiveInconclusiveText", pa.error || "Bot-protection challenge was served. Passive audit findings are not reliable.");
+            el("passiveStatusBadge").textContent = "Inconclusive";
+            el("passiveStatusBadge").className = "passive-badge badge-inconclusive";
+        } else {
+            hide("passiveInconclusiveAlert");
+            el("passiveStatusBadge").textContent = "Readiness Verified";
+            el("passiveStatusBadge").className = "passive-badge badge-active";
+        }
+
+        // Numbers
+        text("statTrackersCount", summ.trackers_count ?? (pa.tracker_requests ? pa.tracker_requests.length : 0));
+        text("statTrackerCookiesCount", summ.tracker_cookies_count ?? (pa.tracker_cookies ? pa.tracker_cookies.length : 0));
+        text("statCookieIssuesCount", summ.cookie_issues_count ?? (pa.cookie_issues ? pa.cookie_issues.length : 0));
+        text("statMissingHeadersCount", summ.missing_headers_count ?? (pa.missing_headers ? pa.missing_headers.length : 0));
+
+        // Trackers list
+        const trList = el("passiveTrackersList");
+        trList.innerHTML = "";
+        const trackers = pa.tracker_requests || [];
+        if (trackers.length === 0) {
+            trList.innerHTML = '<div class="passive-empty">✓ No known trackers fired before user interaction.</div>';
+        } else {
+            const table = document.createElement("table");
+            table.className = "passive-mini-table";
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Tracker</th>
+                        <th>Category</th>
+                        <th>Requests</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${trackers.map(t => `
+                        <tr>
+                            <td><strong>${escapeHtml(t.name)}</strong></td>
+                            <td><span class="category-badge category-${escapeHtml(t.category || 'other')}">${escapeHtml(t.category || 'other')}</span></td>
+                            <td><span class="req-count-badge">${t.request_count || 1}x</span></td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            `;
+            trList.appendChild(table);
+        }
+
+        // Cookie issues list
+        const ckList = el("passiveCookiesList");
+        ckList.innerHTML = "";
+        const cookieIssues = pa.cookie_issues || [];
+        if (cookieIssues.length === 0) {
+            ckList.innerHTML = '<div class="passive-empty">✓ All observed cookies set appropriate security flags.</div>';
+        } else {
+            const table = document.createElement("table");
+            table.className = "passive-mini-table";
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Cookie</th>
+                        <th>Domain</th>
+                        <th>Security Issues</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${cookieIssues.slice(0, 10).map(c => `
+                        <tr>
+                            <td><code>${escapeHtml(c.name)}</code></td>
+                            <td class="muted-cell">${escapeHtml(c.domain || '')}</td>
+                            <td><span class="flag-issue-pill">${escapeHtml((c.issues || []).join(", "))}</span></td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            `;
+            ckList.appendChild(table);
+            if (cookieIssues.length > 10) {
+                const note = document.createElement("div");
+                note.className = "passive-more-note";
+                note.textContent = `... and ${cookieIssues.length - 10} more cookie flag issues (see PDF report for complete list).`;
+                ckList.appendChild(note);
+            }
+        }
+
+        // Security headers list
+        const hdList = el("passiveHeadersList");
+        hdList.innerHTML = "";
+        const missingHeaders = pa.missing_headers || [];
+        const table = document.createElement("table");
+        table.className = "passive-mini-table";
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Security Header</th>
+                    <th>Status</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${missingHeaders.map(h => `
+                    <tr>
+                        <td><strong>${escapeHtml(h.header)}</strong></td>
+                        <td><span class="badge badge-fail">Missing</span></td>
+                        <td class="muted-cell">${escapeHtml(h.why || '')}</td>
+                    </tr>
+                `).join("")}
+                ${missingHeaders.length === 0 ? '<tr><td colspan="3" class="passive-empty">✓ All key security headers are configured.</td></tr>' : ''}
+            </tbody>
+        `;
+        hdList.appendChild(table);
+
+        // Forms issues
+        const formIssues = pa.form_issues || [];
+        const formsSection = el("passiveFormsSection");
+        if (formIssues && formIssues.length > 0) {
+            show("passiveFormsSection");
+            const formsList = el("passiveFormsList");
+            formsList.innerHTML = formIssues.map(f => `
+                <div class="form-issue-row">
+                    <span class="badge badge-fail">${escapeHtml(f.type || 'Security Concern')}</span>
+                    <span class="form-issue-detail">${escapeHtml(f.detail || '')}</span>
+                </div>
+            `).join("");
+        } else {
+            hide("passiveFormsSection");
+        }
+
+        show("passiveAuditCard");
+    } else {
+        hide("passiveAuditCard");
+    }
+
     // Scroll to results
     el("resultsCard").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+
+function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+
+// ── Show inconclusive panel ──────────────────────────────────────
+
+function showInconclusive(data) {
+    hide("progressCard");
+    hide("resultsCard");
+    hide("errorCard");
+    show("inconclusiveCard");
+
+    el("scanBtn").disabled = false;
+    text("scanBtnText", "Scan Now");
+
+    const targetDomain = data.domain || el("domainInput").value.trim();
+    text("inconclusiveDomain", targetDomain ? `Target: https://${targetDomain}` : "");
+    text("inconclusiveReason", data.reason || "Automated scan could not be completed.");
+    text("inconclusiveDetail", data.detail || "Verify manually in a standard web browser (DevTools > Network).");
+
+    el("inconclusiveCard").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 
@@ -274,6 +465,7 @@ function showResults(data) {
 
 function showError(message) {
     hide("progressCard");
+    hide("inconclusiveCard");
     show("errorCard");
 
     el("scanBtn").disabled = false;
@@ -301,8 +493,10 @@ function newScan() {
 
     hide("resultsCard");
     hide("errorCard");
+    hide("inconclusiveCard");
     hide("progressCard");
     hide("verifyVerdict");
+    hide("passiveAuditCard");
 
     el("domainInput").value = "";
     el("domainInput").focus();
@@ -322,7 +516,7 @@ function resetProgressPanel() {
     text("progressPercent", "0%");
     el("logBox").innerHTML = "";
 
-    ["crawl", "audit", "verify", "score", "report"].forEach(s => {
+    ["crawl", "tracker", "audit", "verify", "score", "report"].forEach(s => {
         const stageEl = el(`stage-${s}`);
         if (stageEl) stageEl.className = "stage";
     });

@@ -519,6 +519,62 @@ body {
     background: var(--off-white);
 }
 
+/* ── Inconclusive panel ───────────────────────────────────────── */
+.inconclusive-card {
+    border-top: 4px solid var(--amber);
+    text-align: center;
+    padding: 2.5rem 2rem;
+}
+
+.inconclusive-icon {
+    font-size: 2.75rem;
+    margin-bottom: .75rem;
+}
+
+.inconclusive-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #b45309;
+    margin-bottom: .35rem;
+}
+
+.inconclusive-target {
+    font-family: monospace;
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 1rem;
+}
+
+.inconclusive-reason-box {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 4px solid var(--amber);
+    border-radius: var(--radius);
+    padding: .9rem 1.25rem;
+    margin: 0 auto 1rem;
+    max-width: 640px;
+    color: #92400e;
+    font-weight: 600;
+    font-size: .92rem;
+    text-align: left;
+    line-height: 1.5;
+}
+
+.inconclusive-detail {
+    font-size: .88rem;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+    line-height: 1.5;
+}
+
+.inconclusive-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
 /* ── Error panel ──────────────────────────────────────────────── */
 .error-card {
     border-top: 3px solid var(--red);
@@ -617,7 +673,223 @@ body {
 }
 
 .footer a { color: var(--cyan-dark); text-decoration: none; }
-.footer a:hover { text-decoration: underline; }
+/* ── Passive Pre-Consent Audit Panel ──────────────────────────── */
+.passive-audit-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-top: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+
+.passive-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+}
+
+.passive-sub {
+    font-size: .82rem;
+    color: var(--text-muted);
+}
+
+.passive-badge {
+    font-size: .75rem;
+    font-weight: 700;
+    padding: .2rem .6rem;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.badge-active {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+.badge-inconclusive {
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.passive-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    padding: .85rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1.25rem;
+    font-size: .85rem;
+    color: #78350f;
+    line-height: 1.5;
+}
+
+.passive-alert-icon { font-size: 1.1rem; line-height: 1; }
+
+.passive-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: .75rem;
+    margin-bottom: 1.25rem;
+}
+
+.passive-stat-box {
+    background: var(--off-white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .75rem .5rem;
+    text-align: center;
+}
+
+.passive-stat-num {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--navy);
+    line-height: 1.1;
+}
+
+.passive-stat-lbl {
+    font-size: .7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-top: .25rem;
+}
+
+.passive-subsection {
+    margin-bottom: 1.25rem;
+}
+
+.passive-subtitle {
+    font-size: .88rem;
+    font-weight: 700;
+    color: var(--navy-mid);
+    margin-bottom: .5rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.passive-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .84rem;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.passive-mini-table th {
+    background: var(--off-white);
+    padding: .5rem .75rem;
+    text-align: left;
+    font-size: .72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border-bottom: 1px solid var(--border);
+}
+
+.passive-mini-table td {
+    padding: .5rem .75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.passive-mini-table tr:last-child td {
+    border-bottom: none;
+}
+
+.muted-cell {
+    color: var(--text-muted);
+    font-size: .8rem;
+}
+
+.category-badge {
+    display: inline-block;
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .15rem .5rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.category-advertising { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.category-analytics   { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.category-session_replay { background: #fdf4ff; color: #86198f; border: 1px solid #f0abfc; }
+.category-monitoring  { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.category-tag_manager { background: #fefce8; color: #854d0e; border: 1px solid #fef08a; }
+.category-other       { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+.req-count-badge {
+    display: inline-block;
+    background: var(--off-white);
+    border: 1px solid var(--border);
+    padding: .1rem .45rem;
+    border-radius: 4px;
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--navy);
+}
+
+.flag-issue-pill {
+    display: inline-block;
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    padding: .15rem .5rem;
+    font-size: .76rem;
+    font-weight: 600;
+}
+
+.passive-empty {
+    font-size: .82rem;
+    color: #15803d;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    padding: .6rem .85rem;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.passive-more-note {
+    font-size: .78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: .4rem;
+}
+
+.form-issue-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .35rem 0;
+    font-size: .84rem;
+}
+
+.form-issue-detail {
+    color: var(--text-mid);
+}
+
+.passive-limitations {
+    font-size: .75rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 1rem;
+    border-top: 1px dashed var(--border);
+    padding-top: .75rem;
+}
 
 /* ── Utility ──────────────────────────────────────────────────── */
 .hidden { display: none !important; }

@@ -1,4 +1,9 @@
 # auditor.py
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import re
 import spacy
 from rules import DPDP_RULES
@@ -22,8 +27,14 @@ _verification_cache = {}
 # ---------------------------------------------------------------
 
 def check_page_exists(crawl_result: dict, target_keyword: str) -> bool:
-    for label in crawl_result["pages_found"].keys():
-        if target_keyword.lower() in label.lower():
+    target_l = target_keyword.lower()
+    for label, page_data in crawl_result.get("pages_found", {}).items():
+        if target_l in label.lower():
+            return True
+        if target_l in page_data.get("url", "").lower():
+            return True
+        text_preview = page_data.get("text", "")[:5000].lower()
+        if f"{target_l} policy" in text_preview or f"{target_l} notice" in text_preview:
             return True
     return False
 
@@ -222,8 +233,8 @@ def run_audit(
             "check_type":  check_type
         }
 
-        status_icon = "✅ PASS" if passed else "❌ FAIL"
-        print(f"  [{rule_id}] {status_icon} — {rule['label']} ({rule['severity']})")
+        status_icon = "[PASS]" if passed else "[FAIL]"
+        print(f"  [{rule_id}] {status_icon} - {rule['label']} ({rule['severity']})")
 
     print(f"\n{'=' * 60}\n")
 

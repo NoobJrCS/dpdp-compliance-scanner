@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DPDP Scanner — Test Page (deliberately non-compliant)</title>
+
+<!-- Trackers that fire immediately, before any consent -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-TEST123"></script>
+<script async src="https://www.clarity.ms/tag/test123"></script>
+<script async src="https://connect.facebook.net/en_US/fbevents.js"></script>
+<script async src="https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js"></script>
+</head>
+<body>
+<h1>Test shop</h1>
+
+<!-- Meta pixel beacon (host also used for non-tracking, matched by /tr path) -->
+<img src="https://www.facebook.com/tr?id=123&ev=PageView" width="1" height="1" alt="">
+<!-- NOT a tracker: Facebook login widget path should NOT be flagged -->
+<img src="https://www.facebook.com/images/fb_icon.png" width="1" height="1" alt="">
+
+<!-- Cookie banner exists but nothing is blocked -->
+<div id="cookie-banner">We use cookies. <button>Accept all</button></div>
+
+<!-- Insecure form collecting credentials over HTTP -->
+<form action="http://insecure.example.org/login" method="post">
+  <input type="email" name="email">
+  <input type="password" name="password">
+</form>
+
+<!-- Form posting personal data to a third-party domain (HTTPS) -->
+<form action="https://crm.thirdparty.example.net/lead" method="post">
+  <input type="tel" name="phone">
+</form>
+
+<!-- Cookies set by JS before any interaction -->
+<script>
+  document.cookie = "_ga=GA1.2.111.222; path=/";
+  document.cookie = "_fbp=fb.1.123.456; path=/";
+  document.cookie = "session_id=abc123; path=/";   // session-like, JS-set
+  document.cookie = "theme=dark; path=/";          // harmless preference cookie
+</script>
+</body>
+</html>

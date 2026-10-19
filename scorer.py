@@ -111,10 +111,11 @@ def _enrich_checks(audit_results: dict) -> dict:
 
 
 def generate_score_report(
-    crawl_result:        dict,
-    audit_results:       dict,
-    scan_duration:       float,
-    verification_result: dict | None = None   # ← new parameter
+    crawl_result:          dict,
+    audit_results:         dict,
+    scan_duration:         float,
+    verification_result:   dict | None = None,
+    passive_audit_result:  dict | None = None
 ) -> dict:
     """
     Master scoring function. Builds the complete report dictionary
@@ -162,6 +163,9 @@ def generate_score_report(
         # Contact verification — full result from verifier.py
         # None if no pages were crawled or verification wasn't run
         "verification": verification_result,
+
+        # Passive pre-consent audit (trackers, cookies, security headers)
+        "passive_audit": passive_audit_result,
 
         # Crawl metadata
         "pages_crawled": [
