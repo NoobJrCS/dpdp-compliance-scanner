@@ -92,6 +92,11 @@ TRACKER_RULES = [
     ("outbrain.com",              None,   "Outbrain",                "advertising"),
     ("appsflyer.com",             None,   "AppsFlyer",               "advertising"),
     ("branch.io",                 None,   "Branch",                  "advertising"),
+    ("amazon-adsystem.com",       None,   "Amazon Ads",              "advertising"),
+    ("criteo.com",                None,   "Criteo",                  "advertising"),
+    ("criteo.net",                None,   "Criteo",                  "advertising"),
+    ("rudderstack.com",           None,   "RudderStack",             "analytics"),
+    ("klaviyo.com",               None,   "Klaviyo",                 "analytics"),
     # Adobe Experience Cloud
     ("omtrdc.net",                None,   "Adobe Analytics",         "analytics"),
     ("demdex.net",                None,   "Adobe Audience Manager",  "analytics"),
@@ -104,6 +109,7 @@ TRACKER_RULES = [
     ("datadoghq.com",             None,   "Datadog",                 "monitoring"),
     ("browser.sentry-cdn.com",    None,   "Sentry",                  "monitoring"),
     ("sentry.io",                 None,   "Sentry",                  "monitoring"),
+    ("go-mpulse.net",             None,   "Akamai mPulse RUM",       "monitoring"),
 ]
 
 # Cookie-name patterns that indicate tracking/analytics or monitoring cookies
@@ -264,7 +270,11 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
 
         main_response = None
         try:
-            main_response = page.goto(url, wait_until="load", timeout=timeout_ms)
+            main_response = page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            try:
+                page.wait_for_load_state("load", timeout=8000)
+            except PlaywrightTimeout:
+                pass
             try:
                 page.wait_for_load_state("networkidle", timeout=settle_ms + 4000)
             except PlaywrightTimeout:
@@ -378,7 +388,11 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
                 touches_data = f["has_password"] or f["has_pii"]
                 if not touches_data:
                     continue
-                if resolved.startswith("http://"):
+                resolved_host = urlparse(resolved).hostname or ""
+                final_host = urlparse(final_url).hostname or ""
+                is_local = resolved_host in ("localhost", "127.0.0.1") or final_host in ("localhost", "127.0.0.1")
+
+                if resolved.startswith("http://") and not is_local:
                     result["form_issues"].append({
                         "type": "insecure_submission",
                         "detail": f"Form collecting "
@@ -391,7 +405,7 @@ def audit_page(target: str, settle_ms: int = 4000, timeout_ms: int = 30000) -> d
                         "detail": f"Form collecting personal data posts to a different "
                                   f"domain: {urlparse(resolved).hostname}",
                     })
-                if f["has_password"] and not final_url.startswith("https://"):
+                if f["has_password"] and not final_url.startswith("https://") and not is_local:
                     result["form_issues"].append({
                         "type": "password_on_http_page",
                         "detail": "Password field served on a page loaded over HTTP.",

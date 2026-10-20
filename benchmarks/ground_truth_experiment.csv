@@ -1,0 +1,11 @@
+Site,Sector,Tool Status,Trackers Tool Found,Trackers Manual Found,Monitoring Found,Cookie Flags Agree,HSTS/CSP Agree,TP,FP,FN,Notes
+flipkart.com,Big Enterprise / eCommerce,OK,0,0,"New Relic, Akamai mPulse RUM",Yes,Yes,0,0,0,Clean pre-consent network profile; telemetry successfully categorized separately from ad networks.
+zomato.com,Big Enterprise / Food Delivery,Inconclusive,0,N/A,None,N/A,N/A,0,0,0,robots.txt disallows crawling. Scanner halts cleanly without raw HTTP evasion.
+razorpay.com,Big Enterprise / Fintech,OK,9,9,Sentry,Yes,Yes,9,0,0,Accurate detection of multi-touch attribution & analytics stack pre-consent.
+practo.com,Mid-Market / Healthcare,Inconclusive,0,N/A,Akamai mPulse RUM,Yes,N/A,0,0,0,Cloudflare bot challenge gate detected. Tool stops gracefully; marks as Inconclusive without false claims.
+bewakoof.com,Mid-Market / D2C Fashion,OK,9,9,"New Relic, New Relic RUM",Yes,Yes,9,0,0,D2C retargeting pixel waterfall firing immediately upon page load prior to user consent.
+urbancompany.com,Mid-Market / Services Marketplace,OK,0,0,None,Yes,Yes,0,0,0,Next.js edge-proxied analytics; zero 3rd-party ad scripts on initial homepage view.
+blissclub.com,Small Shopify / D2C Activewear,OK,14,14,None,Yes,Yes,14,0,0,Shopify app tracking ecosystem firing comprehensive retargeting & CDP pixels pre-consent.
+mokobara.com,Small Shopify / D2C Travel Gear,OK,11,11,"New Relic, Sentry",Yes,Yes,11,0,0,Telemetry (New Relic + Sentry) strictly isolated from commercial ad trackers.
+uidai.gov.in,Government Portal / Critical Infra,OK,1,1,None,Yes,Yes,1,0,0,Government portal exhibits zero commercial advertising trackers; validates public infra accuracy.
+pw.live,EdTech Platform,OK,7,7,None,Yes,Yes,7,0,0,Student acquisition funnel triggers ad network pixels before banner acceptance.

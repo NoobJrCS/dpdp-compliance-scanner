@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliant Enterprise — DPDP Compliance Test Page</title>
+    <!-- No third-party ad or tracking scripts loaded prior to consent -->
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/products">Products</a>
+            <a href="/about">About Us</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Welcome to Example Corp</h1>
+        <p>A demonstration of clean, privacy-first web architecture aligned with DPDP Act 2023.</p>
+
+        <!-- Pre-consent cookie notice mechanism with explicit consent choice -->
+        <div id="cookie-consent-banner" style="background: #f1f5f9; padding: 12px; border: 1px solid #cbd5e1; margin: 20px 0;">
+            <p><strong>Cookie & Privacy Notice:</strong> We use essential cookies to operate our service. Non-essential tracking cookies will only load with your explicit consent.</p>
+            <button id="accept-cookies">Accept Selected</button>
+            <button id="reject-cookies">Reject Non-Essential</button>
+        </div>
+
+        <!-- Secure Form collecting inquiry details over HTTPS to same-origin -->
+        <section>
+            <h2>Contact Our Team</h2>
+            <form action="/api/contact" method="post">
+                <label for="name">Full Name:</label>
+                <input type="text" id="name" name="name" required><br><br>
+                <label for="email">Work Email:</label>
+                <input type="email" id="email" name="email" required><br><br>
+                <button type="submit">Submit Inquiry</button>
+            </form>
+        </section>
+    </main>
+
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+        <p>&copy; 2026 Example Corp India Pvt Ltd. All rights reserved.</p>
+        <p>
+            <a href="/privacy-policy">Privacy Policy</a> | 
+            <a href="/terms-of-service">Terms of Service</a> |
+            <a href="/grievance">Grievance Redressal</a>
+        </p>
+        <p style="font-size: 0.85rem; color: #64748b;">
+            Data Protection Officer: Vikram Malhotra | Email: dpo@examplecorp.in | Grievance Redressal Cell: grievance@examplecorp.in
+        </p>
+    </footer>
+
+    <!-- Only safe first-party preference cookies set (Secure & SameSite compliant) -->
+    <script>
+        document.cookie = "app_theme=light; path=/; SameSite=Lax; Secure";
+        document.cookie = "ui_locale=en-IN; path=/; SameSite=Lax; Secure";
+    </script>
+</body>
+</html>
